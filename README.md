@@ -7,4 +7,4 @@ minimalistic drawing fun - not tying to be anything other than what it is
  - Rework UI to be moar better and stuff
  - Add walker count selector to UI
  - Add color hue, saturation, jitter with range values
- - some more stuffs
+ - do some more other stuffs
