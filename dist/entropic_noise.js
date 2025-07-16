@@ -42,7 +42,7 @@ let debugDrawImageOnce = false;
 let audioContext, analyser, micStream, audioData = new Uint8Array(256);
 let audioVolume = 0;
 let micGain = 3.0;
-let useMic = true;
+let useMic = false;
 
 let backgroundUpdate = false;
 let autoDrawEnabled = false;
@@ -907,7 +907,7 @@ function _entropyBundleConfig(_def_) {
       opacity: { val: 200, min: 2, max: 255, step: 1 },
       baseSpread: { val: 400, min: 1, max: 1000, step: 1 },
       spreadAmount: { val: 0.0, min: 0, max: 10, step: 0.01 },
-      pushAmount: { val: 0.02, min: 0.001, max: 0.3, step: 0.001 },
+      pushAmount: { val: 0.05, min: 0.001, max: 0.3, step: 0.001 },
       //______________________________________________________________
       lineOffset_X: { val: 0, min: 0, max: 900, step: 1},
       lineOffset_Y: { val: 0, min: 0, max: 900, step: 1},
