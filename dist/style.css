@@ -5,3 +5,37 @@ html, body {
 canvas {
   display: block;
 }
+
+/* Tweakpane styling */
+.tp-dfwv,
+.tp-rotv {
+  position: fixed !important;
+  top: 10px !important;
+  right: 10px !important;
+  z-index: 9999 !important;
+  max-height: calc(100vh - 20px) !important;
+  overflow-y: auto !important;
+  width: 320px !important;
+}
+
+/* Make Tweakpane scrollable if content is too tall */
+.tp-dfwv::-webkit-scrollbar,
+.tp-rotv::-webkit-scrollbar {
+  width: 8px;
+}
+
+.tp-dfwv::-webkit-scrollbar-track,
+.tp-rotv::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.tp-dfwv::-webkit-scrollbar-thumb,
+.tp-rotv::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+}
+
+.tp-dfwv::-webkit-scrollbar-thumb:hover,
+.tp-rotv::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.5);
+}

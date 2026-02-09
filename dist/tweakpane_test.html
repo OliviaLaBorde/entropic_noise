@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tweakpane Test</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: Arial, sans-serif;
+      background: #333;
+      color: white;
+    }
+    #status {
+      margin: 20px;
+      padding: 20px;
+      background: #222;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Tweakpane Test</h1>
+  <div id="status">
+    <p>Loading...</p>
+  </div>
+
+  <script src="./tweakpane.min.js?v=3"></script>
+  
+  <script>
+    const statusDiv = document.getElementById('status');
+    
+    function log(msg, isError = false) {
+      const p = document.createElement('p');
+      p.textContent = msg;
+      p.style.color = isError ? '#ff6b6b' : '#51cf66';
+      statusDiv.appendChild(p);
+      console.log(msg);
+    }
+    
+    // Wait for library to load
+    setTimeout(() => {
+      log('1. Checking if Tweakpane is loaded...');
+      
+      if (typeof Tweakpane === 'undefined') {
+        log('❌ Tweakpane is NOT loaded!', true);
+        return;
+      }
+      
+      log('✅ Tweakpane library is loaded');
+      log('Tweakpane version: ' + (Tweakpane.version || 'unknown'));
+      
+      try {
+        log('2. Creating Tweakpane instance...');
+        const pane = new Tweakpane.Pane({
+          title: 'Test Controls',
+          expanded: true,
+        });
+        
+        log('✅ Tweakpane instance created');
+        log('Pane element: ' + pane.element.tagName);
+        
+        // Add a test parameter
+        const PARAMS = { value: 50 };
+        pane.addInput(PARAMS, 'value', {
+          label: 'Test Slider',
+          min: 0,
+          max: 100,
+          step: 1
+        });
+        
+        log('✅ Test slider added');
+        log('3. Check if you see the Tweakpane panel on the right side of the page!');
+        
+      } catch (error) {
+        log('❌ Error: ' + error.message, true);
+        console.error(error);
+      }
+    }, 500);
+  </script>
+</body>
+</html>

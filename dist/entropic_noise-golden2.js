@@ -44,10 +44,6 @@ let ui_toast_timer = null;
 
 let _presetsStore = {}; // name -> preset object
 
-// Tweakpane UI
-let tweakpane;
-let tweakpaneParams = {};
-
 let sourceImage = null;
 let sourceImageX = 0;
 let sourceImageY = 0;
@@ -103,14 +99,6 @@ function setup() {
   });
 
   uiBuild();
-  
-  // Delay Tweakpane initialization to ensure library is loaded
-  setTimeout(() => {
-    console.log('🔧 Attempting to build Tweakpane UI...');
-    console.log('Tweakpane available?', typeof Tweakpane !== 'undefined');
-    buildTweakpaneUI();
-  }, 100);
-  
   loadPresetsFromServer();
 }
 
@@ -315,13 +303,8 @@ function resetEntropy() {
   let toggle = autoDrawEnabled;
   if(toggle) {autoDrawEnabled = false;}
   entropy.stop();
-  
-  // Reset walkers but preserve current settings
-  // Pass the full entropy.def which contains bundleDef, controllers, and counters
-  entropy = new _entropyBundle(_entropyBundleConfig(entropy.def), _entropyConfig(entropy.def.controllers));
-  
+  entropy = new _entropyBundle(_entropyBundleConfig(), _entropyConfig());
   uiParamChanged();
-  // Don't rebuild Tweakpane UI - settings haven't changed, only walker positions
   if(toggle) {autoDrawEnabled = true;}
   if (ui_displayed) {
     uiHide();
@@ -380,26 +363,6 @@ function registerPreset(name, obj) {
     if (ui_select_presets.elt.options[i].value === name) { found = true; break; }
   }
   if (!found) ui_select_presets.option(name);
-  
-  // Update Tweakpane dropdown if it exists
-  updateTweakpanePresetList();
-}
-
-let presetsLoadedCount = 0;
-let totalPresetsToLoad = 0;
-
-function updateTweakpanePresetList() {
-  if (!tweakpane) return;
-  
-  presetsLoadedCount++;
-  
-  // Rebuild Tweakpane UI when all presets are loaded
-  // Use a small delay to batch multiple preset registrations
-  clearTimeout(window.presetRebuildTimer);
-  window.presetRebuildTimer = setTimeout(() => {
-    console.log(`🔄 Rebuilding Tweakpane UI with ${Object.keys(_presetsStore).length} presets...`);
-    buildTweakpaneUI();
-  }, 500); // Wait 500ms after last preset registration
 }
 
 function applySelectedPreset() {
@@ -443,7 +406,6 @@ function applyPresetObject(preset) {
   const walker = _entropyConfig(preset.controllers || null);
   entropy = new _entropyBundle(cfg, walker);
   uiParamChanged();
-  buildTweakpaneUI(); // Rebuild Tweakpane UI with preset values
   // clearCanvas(); // commented out to preserve previous canvas state
 }
 
@@ -470,20 +432,13 @@ function loadPresetsFromServer() {
       return res.json().then(list => ({ list, base: attempt.replace(/index\.json$/i, '') }));
     }).then(({ list, base }) => {
       if (!Array.isArray(list)) return;
-      console.log(`✅ Found preset index at ${attempt}, loading ${list.length} presets...`);
       list.forEach(item => {
         if (typeof item === 'string') {
           const file = base + item;
-          fetch(file).then(r => r.json()).then(p => {
-            registerPreset(item.replace(/\.json$/i,''), p);
-            console.log(`✅ Loaded preset: ${item}`);
-          }).catch(e => console.warn('Failed to load preset', file, e));
+          fetch(file).then(r => r.json()).then(p => registerPreset(item.replace(/\.json$/i,''), p)).catch(e => console.warn('Failed to load preset', file, e));
         } else if (item && item.file) {
           const file = base + item.file;
-          fetch(file).then(r => r.json()).then(p => {
-            registerPreset(item.name || item.file.replace(/\.json$/i,''), p);
-            console.log(`✅ Loaded preset: ${item.name || item.file}`);
-          }).catch(e => console.warn('Failed to load preset', file, e));
+          fetch(file).then(r => r.json()).then(p => registerPreset(item.name || item.file.replace(/\.json$/i,''), p)).catch(e => console.warn('Failed to load preset', file, e));
         }
       });
     }).catch(err => {
@@ -514,7 +469,6 @@ function keyPressed() {
 
   if (key === 'a' || key === 'A') {
     autoDrawEnabled = !autoDrawEnabled;
-    syncTweakpaneValues(); // Sync Tweakpane autoDraw checkbox
   }
 
   if (key === 'r' || key === 'R') {
@@ -552,506 +506,6 @@ function handleImage(file) {
   }
 }
 
-
-function buildTweakpaneUI() {
-  // Check if Tweakpane library is loaded
-  if (typeof Tweakpane === 'undefined') {
-    console.warn('⚠️ Tweakpane library not loaded. Skipping Tweakpane UI build.');
-    return;
-  }
-  
-  const presetCount = Object.keys(_presetsStore).length;
-  console.log(`✨ Building Tweakpane UI (v3 API) with ${presetCount} presets...`);
-  console.log('Entropy object:', entropy);
-  
-  if (tweakpane) {
-    console.log('Disposing old Tweakpane instance');
-    tweakpane.dispose();
-  }
-  
-  try {
-    tweakpane = new Tweakpane.Pane({
-      title: 'Entropic Noise Controls',
-      expanded: true,
-      container: document.body,
-    });
-    
-    console.log('✅ Tweakpane instance created:', tweakpane);
-    
-    // Ensure the element is visible and positioned
-    if (tweakpane.element) {
-      tweakpane.element.style.position = 'fixed';
-      tweakpane.element.style.top = '10px';
-      tweakpane.element.style.right = '10px';
-      tweakpane.element.style.zIndex = '9999';
-      console.log('✅ Tweakpane element styled:', tweakpane.element);
-    }
-  } catch (error) {
-    console.error('❌ Error creating Tweakpane:', error);
-    return;
-  }
-
-  // Helper function to build controls for a config object
-  function buildControlsFromConfig(folder, config, path = '', updateCallback = null) {
-    Object.keys(config).forEach(key => {
-      const value = config[key];
-      const fullPath = path ? `${path}.${key}` : key;
-      
-      // Handle objects with val/min/max/step (sliders)
-      if (value && typeof value === 'object' && value.hasOwnProperty('val')) {
-        tweakpaneParams[fullPath] = value.val;
-        
-        const binding = folder.addInput(tweakpaneParams, fullPath, {
-          label: key,
-          min: value.min,
-          max: value.max,
-          step: value.step
-        });
-        
-        if (updateCallback) {
-          binding.on('change', (ev) => {
-            updateCallback(key, ev.value);
-          });
-        }
-      }
-      // Handle boolean values (checkboxes)
-      else if (typeof value === 'boolean') {
-        tweakpaneParams[fullPath] = value;
-        
-        const binding = folder.addInput(tweakpaneParams, fullPath, {
-          label: key
-        });
-        
-        if (updateCallback) {
-          binding.on('change', (ev) => {
-            updateCallback(key, ev.value);
-          });
-        }
-      }
-      // Handle string values (text input or dropdown if specific values)
-      else if (typeof value === 'string') {
-        tweakpaneParams[fullPath] = value;
-        
-        const binding = folder.addInput(tweakpaneParams, fullPath, {
-          label: key
-        });
-        
-        if (updateCallback) {
-          binding.on('change', (ev) => {
-            updateCallback(key, ev.value);
-          });
-        }
-      }
-      // Handle number values (numeric input)
-      else if (typeof value === 'number') {
-        tweakpaneParams[fullPath] = value;
-        
-        const binding = folder.addInput(tweakpaneParams, fullPath, {
-          label: key
-        });
-        
-        if (updateCallback) {
-          binding.on('change', (ev) => {
-            updateCallback(key, ev.value);
-          });
-        }
-      }
-    });
-  }
-
-  // Bundle Definition folder
-  if (entropy && entropy.def && entropy.def.bundleDef) {
-    const bundleFolder = tweakpane.addFolder({
-      title: 'Bundle Definition',
-      expanded: false,
-    });
-    
-    buildControlsFromConfig(bundleFolder, entropy.def.bundleDef, 'bundle', (key, value) => {
-      entropy.def.bundleDef[key].val = value;
-      // Note: Some bundle changes require reset
-    });
-  }
-
-  // Controllers folder - organized by category
-  if (entropy && entropy.def && entropy.def.controllers) {
-    const controllersFolder = tweakpane.addFolder({
-      title: 'Controllers',
-      expanded: true,
-    });
-    
-    // Build controls for non-color-related controllers
-    const excludeKeys = ['strokeWidth', 'opacity', 'colorHue', 'colorSaturation', 'colorBrightness', 'colorBlendMode', 'sampleColor'];
-    
-    Object.keys(entropy.def.controllers).forEach(key => {
-      if (excludeKeys.includes(key)) return; // Skip color-related controls
-      
-      const value = entropy.def.controllers[key];
-      
-      // Handle slider values
-      if (value && typeof value === 'object' && value.hasOwnProperty('val')) {
-        tweakpaneParams[`controller_${key}`] = value.val;
-        
-        const binding = controllersFolder.addInput(tweakpaneParams, `controller_${key}`, {
-          label: key,
-          min: value.min,
-          max: value.max,
-          step: value.step
-        });
-        
-        binding.on('change', (ev) => {
-          const setterName = `set_${key}`;
-          if (typeof entropy[setterName] === 'function') {
-            entropy[setterName](ev.value);
-          } else {
-            entropy.def.controllers[key].val = ev.value;
-            entropy.c.forEach(item => {
-              if (item.def.controllers[key] && item.def.controllers[key].hasOwnProperty('val')) {
-                item.def.controllers[key].val = ev.value;
-              }
-            });
-          }
-        });
-      }
-      // Handle boolean values
-      else if (typeof value === 'boolean') {
-        tweakpaneParams[`controller_${key}`] = value;
-        
-        const binding = controllersFolder.addInput(tweakpaneParams, `controller_${key}`, {
-          label: key
-        });
-        
-        binding.on('change', (ev) => {
-          const setterName = `set_${key}`;
-          if (typeof entropy[setterName] === 'function') {
-            entropy[setterName](ev.value);
-          } else {
-            entropy.def.controllers[key] = ev.value;
-            entropy.c.forEach(item => {
-              item.def.controllers[key] = ev.value;
-            });
-          }
-        });
-      }
-      // Handle numeric values (like oscillation amplitude)
-      else if (typeof value === 'number') {
-        tweakpaneParams[`controller_${key}`] = value;
-        
-        const binding = controllersFolder.addInput(tweakpaneParams, `controller_${key}`, {
-          label: key
-        });
-        
-        binding.on('change', (ev) => {
-          const setterName = `set_${key}`;
-          if (typeof entropy[setterName] === 'function') {
-            entropy[setterName](ev.value);
-          } else {
-            entropy.def.controllers[key] = ev.value;
-          }
-        });
-      }
-    });
-  }
-
-  // Color Controls folder
-  const colorFolder = tweakpane.addFolder({
-    title: 'Color Controls',
-    expanded: true,
-  });
-
-  // Brush Color - Enable/Disable color cycling
-  tweakpaneParams.enableBrushColor = false;
-  colorFolder.addInput(tweakpaneParams, 'enableBrushColor', {
-    label: 'Enable Brush Color'
-  }).on('change', (ev) => {
-    // When disabled, use color cycling; when enabled, use fixed color
-    entropy.def.controllers.useBrushColor = ev.value;
-    entropy.c.forEach(item => {
-      item.def.controllers.useBrushColor = ev.value;
-    });
-  });
-
-  // Brush Color Picker
-  tweakpaneParams.brushColor = '#ffffff';
-  colorFolder.addInput(tweakpaneParams, 'brushColor', {
-    label: 'Brush Color'
-  }).on('change', (ev) => {
-    const hexColor = ev.value;
-    
-    // Parse hex color manually to avoid colorMode issues
-    const hex = hexColor.replace('#', '');
-    const r = parseInt(hex.substring(0, 2), 16);
-    const g = parseInt(hex.substring(2, 4), 16);
-    const b = parseInt(hex.substring(4, 6), 16);
-    
-    // Convert RGB (0-255) to HSB (0-100) using manual calculation
-    // This ensures we get the right values for colorMode(HSB, 100)
-    const rNorm = r / 255;
-    const gNorm = g / 255;
-    const bNorm = b / 255;
-    
-    const max = Math.max(rNorm, gNorm, bNorm);
-    const min = Math.min(rNorm, gNorm, bNorm);
-    const delta = max - min;
-    
-    let h = 0;
-    let s = 0;
-    const br = max;
-    
-    if (delta !== 0) {
-      s = delta / max;
-      
-      if (max === rNorm) {
-        h = ((gNorm - bNorm) / delta) % 6;
-      } else if (max === gNorm) {
-        h = (bNorm - rNorm) / delta + 2;
-      } else {
-        h = (rNorm - gNorm) / delta + 4;
-      }
-      
-      h = h / 6;
-      if (h < 0) h += 1;
-    }
-    
-    // Scale to 0-100 range for p5.js colorMode(HSB, 100)
-    const hueValue = h * 100;
-    const satValue = s * 100;
-    const brightValue = br * 100;
-    
-    // Store the HSB values
-    entropy.def.controllers.brushColorHue = hueValue;
-    entropy.def.controllers.brushColorSaturation = satValue;
-    entropy.def.controllers.brushColorBrightness = brightValue;
-    
-    entropy.c.forEach(item => {
-      item.def.controllers.brushColorHue = hueValue;
-      item.def.controllers.brushColorSaturation = satValue;
-      item.def.controllers.brushColorBrightness = brightValue;
-    });
-    
-    console.log(`Brush Color: ${hexColor} (RGB ${r},${g},${b}) -> HSB(${hueValue.toFixed(1)}, ${satValue.toFixed(1)}, ${brightValue.toFixed(1)})`);
-  });
-
-  // Stroke Width
-  if (entropy.def.controllers.strokeWidth) {
-    tweakpaneParams.strokeWidth = entropy.def.controllers.strokeWidth.val;
-    colorFolder.addInput(tweakpaneParams, 'strokeWidth', {
-      label: 'Stroke Width',
-      min: entropy.def.controllers.strokeWidth.min,
-      max: entropy.def.controllers.strokeWidth.max,
-      step: entropy.def.controllers.strokeWidth.step
-    }).on('change', (ev) => {
-      entropy.set_strokeWidth(ev.value);
-    });
-  }
-
-  // Opacity
-  if (entropy.def.controllers.opacity) {
-    tweakpaneParams.opacity = entropy.def.controllers.opacity.val;
-    colorFolder.addInput(tweakpaneParams, 'opacity', {
-      label: 'Opacity',
-      min: entropy.def.controllers.opacity.min,
-      max: entropy.def.controllers.opacity.max,
-      step: entropy.def.controllers.opacity.step
-    }).on('change', (ev) => {
-      entropy.set_opacity(ev.value);
-    });
-  }
-
-  // Color Blend Mode
-  if (entropy.def.controllers.colorBlendMode) {
-    tweakpaneParams.colorBlendMode = entropy.def.controllers.colorBlendMode;
-    colorFolder.addInput(tweakpaneParams, 'colorBlendMode', {
-      label: 'Blend Mode',
-      options: {
-        'BLEND': 'BLEND',
-        'MULTIPLY': 'MULTIPLY',
-        'SCREEN': 'SCREEN',
-        'ADD': 'ADD',
-        'OVERLAY': 'OVERLAY',
-        'DARKEST': 'DARKEST',
-        'LIGHTEST': 'LIGHTEST',
-        'DIFFERENCE': 'DIFFERENCE',
-        'EXCLUSION': 'EXCLUSION',
-        'SOFT_LIGHT': 'SOFT_LIGHT',
-        'HARD_LIGHT': 'HARD_LIGHT'
-      }
-    }).on('change', (ev) => {
-      entropy.set_colorBlendMode(ev.value);
-    });
-  }
-
-  // Sample Color from Image
-  if (entropy.def.controllers.sampleColor !== undefined) {
-    tweakpaneParams.sampleColor = entropy.def.controllers.sampleColor;
-    colorFolder.addInput(tweakpaneParams, 'sampleColor', {
-      label: 'Sample Color from Image'
-    }).on('change', (ev) => {
-      entropy.set_sampleColor(ev.value);
-    });
-  }
-
-  // Background Color (moved from Meta Controls)
-  tweakpaneParams.bgColor = '#000000';
-  colorFolder.addInput(tweakpaneParams, 'bgColor', {
-    label: 'Background'
-  }).on('change', (ev) => {
-    const hexColor = ev.value;
-    currentBgColor = color(hexColor);
-    if (ui_colorPicker_bg) {
-      ui_colorPicker_bg.value(hexColor);
-    }
-    clearCanvas();
-    adjustUILabelColors(currentBgColor);
-  });
-
-  // Counters folder
-  if (entropy && entropy.def && entropy.def.counters) {
-    const countersFolder = tweakpane.addFolder({
-      title: 'Counters',
-      expanded: false,
-    });
-    
-    Object.keys(entropy.def.counters).forEach(key => {
-      const counter = entropy.def.counters[key];
-      
-      // Value
-      tweakpaneParams[`counter_${key}_val`] = counter.val;
-      countersFolder.addInput(tweakpaneParams, `counter_${key}_val`, {
-        label: `${key} (val)`,
-      }).on('change', (ev) => {
-        entropy.def.counters[key].val = ev.value;
-      });
-      
-      // Step
-      tweakpaneParams[`counter_${key}_step`] = counter.step;
-      countersFolder.addInput(tweakpaneParams, `counter_${key}_step`, {
-        label: `${key} (step)`,
-        min: 0,
-        max: 1,
-        step: 0.001
-      }).on('change', (ev) => {
-        entropy.def.counters[key].step = ev.value;
-      });
-    });
-  }
-
-  // Meta controls folder
-  const metaFolder = tweakpane.addFolder({
-    title: 'Meta Controls',
-    expanded: true,
-  });
-
-  // Mic controls
-  tweakpaneParams.useMic = useMic;
-  metaFolder.addInput(tweakpaneParams, 'useMic', {
-    label: 'Use Mic'
-  }).on('change', (ev) => {
-    useMic = ev.value;
-    if (ui_checkbox_useMic) ui_checkbox_useMic.checked(ev.value);
-  });
-
-  tweakpaneParams.micGain = micGain;
-  metaFolder.addInput(tweakpaneParams, 'micGain', {
-    label: 'Mic Gain',
-    min: 0.5,
-    max: 10.0,
-    step: 0.1
-  }).on('change', (ev) => {
-    micGain = ev.value;
-    if (ui_slider_micGain) ui_slider_micGain.value(ev.value);
-    if (ui_label_micGainValue) ui_label_micGainValue.html(ev.value.toFixed(1));
-  });
-
-  // Auto draw
-  tweakpaneParams.autoDraw = autoDrawEnabled;
-  metaFolder.addInput(tweakpaneParams, 'autoDraw', {
-    label: 'Auto Draw (A key)'
-  }).on('change', (ev) => {
-    autoDrawEnabled = ev.value;
-  });
-
-  // Action buttons
-  const actionsFolder = tweakpane.addFolder({
-    title: 'Actions',
-    expanded: true,
-  });
-
-  actionsFolder.addButton({ title: 'Clear Canvas' }).on('click', () => {
-    clearCanvas();
-  });
-
-  actionsFolder.addButton({ title: 'Reset Walkers (R key)' }).on('click', () => {
-    resetEntropy();
-  });
-
-  actionsFolder.addButton({ title: 'Export PNG' }).on('click', () => {
-    exportImage();
-  });
-
-  actionsFolder.addButton({ title: 'Save Preset' }).on('click', () => {
-    openPresetModal();
-  });
-
-  // Load image button - trigger the hidden p5 file input
-  actionsFolder.addButton({ title: 'Load Image' }).on('click', () => {
-    if (ui_button_loadImage && ui_button_loadImage.elt) {
-      ui_button_loadImage.elt.click();
-    }
-  });
-
-  // Presets section
-  const presetsFolder = tweakpane.addFolder({
-    title: 'Presets',
-    expanded: false,
-  });
-
-  // Build options object from presets store
-  const buildPresetOptions = () => {
-    const options = { '-- Select Preset --': '-- Select Preset --' };
-    Object.keys(_presetsStore).forEach(name => {
-      options[name] = name;
-    });
-    return options;
-  };
-
-  tweakpaneParams.selectedPreset = '-- Select Preset --';
-  
-  // Add dropdown with current presets
-  const presetOptions = buildPresetOptions();
-  if (Object.keys(presetOptions).length > 1) {
-    presetsFolder.addInput(tweakpaneParams, 'selectedPreset', {
-      label: 'Preset',
-      options: presetOptions
-    });
-  } else {
-    // Show message if no presets loaded yet
-    presetsFolder.addButton({ title: 'Loading presets...' }).disabled = true;
-  }
-
-  presetsFolder.addButton({ title: 'Apply Preset' }).on('click', () => {
-    const name = tweakpaneParams.selectedPreset;
-    if (!name || name === '-- Select Preset --') {
-      alert('Select a preset first');
-      return;
-    }
-    const preset = _presetsStore[name];
-    if (!preset) {
-      alert('Preset not found');
-      return;
-    }
-    applyPresetObject(preset);
-    if (typeof showToast === 'function') showToast('Applied preset: ' + name, 2500);
-  });
-  
-  presetsFolder.addButton({ title: 'Load Preset File' }).on('click', () => {
-    if (ui_fileInput_presets && ui_fileInput_presets.elt) {
-      ui_fileInput_presets.elt.click();
-    }
-  });
-
-  console.log('✨ Tweakpane UI built successfully');
-  console.log('Tweakpane element:', tweakpane.element);
-}
 
 function uiBuild() {
   let y = 40;
@@ -1205,17 +659,6 @@ function uiBuild() {
     currentBgColor = ui_colorPicker_bg.color();
     clearCanvas(); // apply new color immediately
     adjustUILabelColors(currentBgColor); // Update label colors so we can see em mane
-    
-    // Sync with Tweakpane (v3 uses hex strings)
-    if (tweakpaneParams.bgColor !== undefined) {
-      // Convert p5 color to hex
-      const c = currentBgColor;
-      const r = Math.round(red(c)).toString(16).padStart(2, '0');
-      const g = Math.round(green(c)).toString(16).padStart(2, '0');
-      const b = Math.round(blue(c)).toString(16).padStart(2, '0');
-      tweakpaneParams.bgColor = `#${r}${g}${b}`;
-      if (tweakpane) tweakpane.refresh();
-    }
   });
   y += 40;
 
@@ -1261,36 +704,6 @@ function uiBuild() {
 }
 
 
-function syncTweakpaneValues() {
-  if (!tweakpane || !entropy) return;
-  
-  // Sync controller values
-  if (entropy.def && entropy.def.controllers) {
-    Object.keys(entropy.def.controllers).forEach(key => {
-      const value = entropy.def.controllers[key];
-      const paramKey = `controller_${key}`;
-      
-      if (value && typeof value === 'object' && value.hasOwnProperty('val')) {
-        if (tweakpaneParams[paramKey] !== undefined) {
-          tweakpaneParams[paramKey] = value.val;
-        }
-      } else if (typeof value === 'boolean' || typeof value === 'number' || typeof value === 'string') {
-        if (tweakpaneParams[paramKey] !== undefined) {
-          tweakpaneParams[paramKey] = value;
-        }
-      }
-    });
-  }
-  
-  // Sync meta values
-  if (tweakpaneParams.useMic !== undefined) tweakpaneParams.useMic = useMic;
-  if (tweakpaneParams.micGain !== undefined) tweakpaneParams.micGain = micGain;
-  if (tweakpaneParams.autoDraw !== undefined) tweakpaneParams.autoDraw = autoDrawEnabled;
-  
-  // Refresh the pane
-  tweakpane.refresh();
-}
-
 function uiParamChanged() {
   entropy.set_baseSpread(ui_slide_baseSpread.value());
   entropy.set_pushAmount(ui_slide_pushAmount.value());
@@ -1307,7 +720,6 @@ function uiParamChanged() {
   entropy.set_spreadOscillationAmplitude(ui_slide_oscAmp.value());
   ui_label_oscAmpValue.html(ui_slide_oscAmp.value());
   entropy.set_sampleColor(ui_checkbox_sampleColor.checked());
-  syncTweakpaneValues(); // Sync Tweakpane with old UI changes
   //uiValidateParameters();
 }
 
@@ -1528,10 +940,11 @@ class _entropyWalker {
   render() {
     blendMode(this.def.controllers.colorBlendMode);
     let c;
-    
-    // Priority: 1. Sample from image, 2. Fixed brush color, 3. Color cycling
     if (this.def.controllers.sampleColor && sourceImage) {
-      // Sample color from loaded image
+
+      let canvasX = this.def.internals.x - sourceImageX;
+      let canvasY = this.def.internals.y - sourceImageY;
+
       let px = floor(this.def.internals.x);
       let py = floor(this.def.internals.y);
 
@@ -1543,30 +956,14 @@ class _entropyWalker {
       c = color(red(rgb), green(rgb), blue(rgb), this.def.controllers.opacity.val);
       colorMode(HSB, 100);
 
-    } else if (this.def.controllers.useBrushColor) {
-      // Use fixed brush color - ensure we're in HSB mode
-      colorMode(HSB, 100);
-      const h = this.def.controllers.brushColorHue || 0;
-      const s = this.def.controllers.brushColorSaturation || 0;
-      const b = this.def.controllers.brushColorBrightness || 100;
-      // Convert opacity from 0-255 range to 0-100 range for HSB mode
-      const a = map(this.def.controllers.opacity.val, 0, 255, 0, 100);
-      c = color(h, s, b, a);
-      
-      // Debug: log once every 60 frames
-      if (frameCount % 60 === 0) {
-        console.log(`Rendering with brush color HSB(${h.toFixed(1)}, ${s.toFixed(1)}, ${b.toFixed(1)}, ${a.toFixed(1)})`);
-      }
+      //console.log(`Sampling at ${px},${py} → color:`, red(rgb), green(rgb), blue(rgb));
+
     } else {
-      // Use color cycling (original behavior)
-      colorMode(HSB, 100);
-      // Convert opacity from 0-255 range to 0-100 range for HSB mode
-      const a = map(this.def.controllers.opacity.val, 0, 255, 0, 100);
       c = color(
         this.def.controllers.colorHue.val,
         this.def.controllers.colorSaturation.val,
         this.def.controllers.colorBrightness.val,
-        a
+        this.def.controllers.opacity.val
       );
     }
 
@@ -1778,11 +1175,6 @@ function _entropyConfig(_def_) {
       colorHue: { val: 0, min: 0, max: 100, step: 0.01},
       colorSaturation: { val: 0, min: 0, max: 100, step: 0.01},
       colorBrightness: { val: 0, min: 50, max: 100, step: 0.01},
-      // New brush color controls
-      useBrushColor: false,
-      brushColorHue: 0,
-      brushColorSaturation: 0,
-      brushColorBrightness: 100,
       fixedAngle: false,
       updateXY: true,
       alwaysStep: false,
@@ -1835,12 +1227,6 @@ function _entropyBundleConfig(_def_) {
       colorHue: { val: 0, min: 0, max: 100, step: 0.01},
       colorSaturation: { val: 0, min: 0, max: 100, step: 0.01},
       colorBrightness: { val: 0, min: 25, max: 100, step: 0.01},
-      //______________________________________________________________
-      // New brush color controls
-      useBrushColor: false,
-      brushColorHue: 0,
-      brushColorSaturation: 0,
-      brushColorBrightness: 100,
       //______________________________________________________________
       fixedAngle: false,
       updateXY: true,
