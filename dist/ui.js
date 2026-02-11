@@ -544,7 +544,7 @@ function buildTweakpaneUI() {
   colorCyclingFolder.addSeparator();
   
   // Quick preset buttons for common color schemes
-  const presetBtn1 = colorCyclingFolder.addButton({ title: '🌈 Full Rainbow' });
+  const presetBtn1 = colorCyclingFolder.addButton({ title: '🌈 Full on GAAAAYYYY :D' });
   presetBtn1.on('click', () => {
     entropy.def.controllers.colorHue.min = 0;
     entropy.def.controllers.colorHue.max = 100;
