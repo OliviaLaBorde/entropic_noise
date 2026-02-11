@@ -1,0 +1,136 @@
+{
+  "timestamp": 1770771455839,
+  "bundleDef": {
+    "brushCount": {
+      "val": 150,
+      "min": 1,
+      "max": 999,
+      "step": 1
+    },
+    "pushOffset": {
+      "val": 0,
+      "min": 0,
+      "max": 1,
+      "step": 0.01
+    },
+    "noiseMapOffset_X": {
+      "val": 0,
+      "min": 0.01,
+      "max": 100,
+      "step": 0.01
+    },
+    "noiseMapOffset_Y": {
+      "val": 0,
+      "min": 0.01,
+      "max": 100,
+      "step": 0.01
+    }
+  },
+  "controllers": {
+    "strokeWidth": {
+      "val": 0.5,
+      "min": 0.02,
+      "max": 5,
+      "step": 0.01
+    },
+    "opacity": {
+      "val": 200,
+      "min": 2,
+      "max": 255,
+      "step": 1
+    },
+    "baseSpread": {
+      "val": 400,
+      "min": 1,
+      "max": 1000,
+      "step": 1
+    },
+    "spreadAmount": {
+      "val": 0,
+      "min": 0,
+      "max": 10,
+      "step": 0.01
+    },
+    "pushAmount": {
+      "val": 0.025,
+      "min": 0.001,
+      "max": 1,
+      "step": 0.001
+    },
+    "lineOffset_X": {
+      "val": 0,
+      "min": 0,
+      "max": 900,
+      "step": 1
+    },
+    "lineOffset_Y": {
+      "val": 0,
+      "min": 0,
+      "max": 900,
+      "step": 1
+    },
+    "lineOffset_Times": {
+      "val": 3,
+      "min": 0,
+      "max": 30,
+      "step": 1
+    },
+    "colorBlendMode": "source-over",
+    "colorHue": {
+      "val": 0,
+      "min": 0,
+      "max": 100,
+      "step": 0.01
+    },
+    "colorSaturation": {
+      "val": 0,
+      "min": 0,
+      "max": 100,
+      "step": 0.01
+    },
+    "colorBrightness": {
+      "val": 0,
+      "min": 25,
+      "max": 100,
+      "step": 0.01
+    },
+    "useBrushColor": false,
+    "brushColorHue": 0,
+    "brushColorSaturation": 0,
+    "brushColorBrightness": 100,
+    "fixedAngle": false,
+    "updateXY": true,
+    "alwaysStep": false,
+    "sampleColor": false,
+    "spreadOscillation": false,
+    "spreadOscillationAmplitude": 100,
+    "allowFunky": false
+  },
+  "counters": {
+    "c1": {
+      "val": 0,
+      "step": 0.02
+    },
+    "c2": {
+      "val": 0,
+      "step": 0.05
+    },
+    "c3": {
+      "val": 0,
+      "step": 0.02
+    },
+    "c4": {
+      "val": 0,
+      "step": 0.01
+    },
+    "c5": {
+      "val": 0,
+      "step": 0.01
+    }
+  },
+  "meta": {
+    "bgColor": "#000000",
+    "useMic": false,
+    "micGain": 3
+  }
+}
