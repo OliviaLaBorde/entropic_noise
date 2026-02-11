@@ -314,7 +314,8 @@ class _entropyBundle {
 function _entropyConfig(_def_) {
   let obj;
   if (typeof _def_ === 'object' && _def_ != null) {
-    obj = Object.assign({}, _def_);
+    // Do a deep copy to avoid reference issues
+    obj = JSON.parse(JSON.stringify(_def_));
   } else {
     obj = new Object();
     obj.controllers = {
@@ -362,7 +363,8 @@ function _entropyConfig(_def_) {
 function _entropyBundleConfig(_def_) {
   let obj;
   if (typeof _def_ === 'object' && _def_ != null) {
-    obj = Object.assign({}, _def_);
+    // Do a deep copy of the preset to avoid reference issues
+    obj = JSON.parse(JSON.stringify(_def_));
   } else {
     obj = new Object();
     obj.bundleDef = {
@@ -396,7 +398,7 @@ function _entropyBundleConfig(_def_) {
       //______________________________________________________________
       fixedAngle: false,
       updateXY: true,
-      alwaysStep: true,
+      alwaysStep: false,
       sampleColor: false,
       spreadOscillation: false,
       spreadOscillationAmplitude: 100,

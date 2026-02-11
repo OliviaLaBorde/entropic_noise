@@ -31,6 +31,4 @@ Run the helper script from tools directory:
 .\tools\serve.ps1
 ```
 
-Notes:
-- After serving, open the app via HTTP (not file://), e.g. http://localhost:8000/dist/yourApp.html
-- Serving via HTTP resolves the CORS/fetch issues for loading preset_brush/index.json
+

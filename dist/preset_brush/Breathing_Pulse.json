@@ -1,0 +1,31 @@
+{
+  "bundleDef": {
+    "brushCount": { "val": 120, "min": 1, "max": 999, "step": 1 },
+    "pushOffset": { "val": 0, "min": 0, "max": 1, "step": 0.01 },
+    "noiseMapOffset_X": { "val": 0.8, "min": 0.01, "max": 100, "step": 0.01 },
+    "noiseMapOffset_Y": { "val": 0.8, "min": 0.01, "max": 100, "step": 0.01 }
+  },
+  "controllers": {
+    "strokeWidth": { "val": 0.2, "min": 0.02, "max": 5, "step": 0.01 },
+    "opacity": { "val": 60, "min": 2, "max": 255, "step": 1 },
+    "baseSpread": { "val": 200, "min": 1, "max": 1000, "step": 1 },
+    "spreadAmount": { "val": 0, "min": 0, "max": 10, "step": 0.01 },
+    "pushAmount": { "val": 0.015, "min": 0.001, "max": 0.3, "step": 0.001 },
+    "lineOffset_X": { "val": 0, "min": 0, "max": 900, "step": 1 },
+    "lineOffset_Y": { "val": 0, "min": 0, "max": 900, "step": 1 },
+    "lineOffset_Times": { "val": 2, "min": 0, "max": 30, "step": 1 },
+    "fixedAngle": false,
+    "updateXY": true,
+    "alwaysStep": true,
+    "spreadOscillation": true,
+    "spreadOscillationAmplitude": 150,
+    "allowFunky": false
+  },
+  "counters": {
+    "c1": { "val": 0, "step": 0.03 },
+    "c2": { "val": 0, "step": 0.04 },
+    "c3": { "val": 0, "step": 0.025 },
+    "c4": { "val": 0, "step": 0.01 },
+    "c5": { "val": 0, "step": 0.01 }
+  }
+}

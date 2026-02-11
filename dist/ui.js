@@ -1085,6 +1085,49 @@ function uiParamChanged() {
   //uiValidateParameters();
 }
 
+// Sync old UI FROM entropy values (opposite of uiParamChanged)
+// This updates the UI sliders to match current entropy values without overwriting entropy
+function syncOldUIFromEntropy() {
+  if (!entropy || !entropy.def) return;
+  
+  // Update sliders with current entropy values
+  if (ui_slide_baseSpread && entropy.def.controllers.baseSpread) {
+    ui_slide_baseSpread.value(entropy.def.controllers.baseSpread.val);
+    ui_label_baseSpreadValue.html(entropy.def.controllers.baseSpread.val);
+  }
+  if (ui_slide_pushAmount && entropy.def.controllers.pushAmount) {
+    ui_slide_pushAmount.value(entropy.def.controllers.pushAmount.val);
+    ui_label_pushAmountValue.html(entropy.def.controllers.pushAmount.val);
+  }
+  if (ui_slide_opacity && entropy.def.controllers.opacity) {
+    ui_slide_opacity.value(entropy.def.controllers.opacity.val);
+    ui_label_opacityValue.html(entropy.def.controllers.opacity.val);
+  }
+  if (ui_slide_strokeWidth && entropy.def.controllers.strokeWidth) {
+    ui_slide_strokeWidth.value(entropy.def.controllers.strokeWidth.val);
+    ui_label_strokeWidthValue.html(entropy.def.controllers.strokeWidth.val);
+  }
+  if (ui_checkbox_fixedAngle) {
+    ui_checkbox_fixedAngle.checked(entropy.def.controllers.fixedAngle);
+  }
+  if (ui_checkbox_spreadOscillation) {
+    ui_checkbox_spreadOscillation.checked(entropy.def.controllers.spreadOscillation);
+  }
+  if (ui_slide_oscAmp && entropy.def.controllers.spreadOscillationAmplitude !== undefined) {
+    ui_slide_oscAmp.value(entropy.def.controllers.spreadOscillationAmplitude);
+    ui_label_oscAmpValue.html(entropy.def.controllers.spreadOscillationAmplitude);
+  }
+  if (ui_checkbox_allowFunky) {
+    ui_checkbox_allowFunky.checked(entropy.def.controllers.allowFunky);
+  }
+  if (ui_checkbox_sampleColor) {
+    ui_checkbox_sampleColor.checked(entropy.def.controllers.sampleColor);
+  }
+  if (ui_dropdown_blendMode && entropy.def.controllers.colorBlendMode) {
+    ui_dropdown_blendMode.selected(entropy.def.controllers.colorBlendMode);
+  }
+}
+
 function uiShow() {
   ui_label_baseSpread.show();
   ui_label_baseSpreadValue.show();

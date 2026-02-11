@@ -40,7 +40,7 @@
       "step": 1
     },
     "baseSpread": {
-      "val": 400,
+      "val": 50,
       "min": 1,
       "max": 1000,
       "step": 1
@@ -75,33 +75,9 @@
       "max": 30,
       "step": 1
     },
-    "colorBlendMode": "source-over",
-    "colorHue": {
-      "val": 0,
-      "min": 0,
-      "max": 100,
-      "step": 0.01
-    },
-    "colorSaturation": {
-      "val": 0,
-      "min": 0,
-      "max": 100,
-      "step": 0.01
-    },
-    "colorBrightness": {
-      "val": 0,
-      "min": 25,
-      "max": 100,
-      "step": 0.01
-    },
-    "useBrushColor": false,
-    "brushColorHue": 0,
-    "brushColorSaturation": 0,
-    "brushColorBrightness": 100,
     "fixedAngle": false,
     "updateXY": true,
     "alwaysStep": true,
-    "sampleColor": false,
     "spreadOscillation": false,
     "spreadOscillationAmplitude": 100,
     "allowFunky": false

@@ -539,7 +539,25 @@ function applySelectedPreset() {
 
 function applyPresetObject(preset) {
   if (!preset) return;
-  // Apply controllers
+  
+  // Save current color settings before applying preset
+  const currentColorSettings = {
+    colorHue: entropy.def.controllers.colorHue ? { ...entropy.def.controllers.colorHue } : null,
+    colorSaturation: entropy.def.controllers.colorSaturation ? { ...entropy.def.controllers.colorSaturation } : null,
+    colorBrightness: entropy.def.controllers.colorBrightness ? { ...entropy.def.controllers.colorBrightness } : null,
+    useBrushColor: entropy.def.controllers.useBrushColor,
+    brushColorHue: entropy.def.controllers.brushColorHue,
+    brushColorSaturation: entropy.def.controllers.brushColorSaturation,
+    brushColorBrightness: entropy.def.controllers.brushColorBrightness,
+    sampleColor: entropy.def.controllers.sampleColor,
+    colorBlendMode: entropy.def.controllers.colorBlendMode,
+    opacity: entropy.def.controllers.opacity ? { ...entropy.def.controllers.opacity } : null,
+    strokeWidth: entropy.def.controllers.strokeWidth ? { ...entropy.def.controllers.strokeWidth } : null
+  };
+  
+  const currentBgColorValue = currentBgColor;
+  
+  // Apply controllers from preset
   if (preset.controllers) {
     const c = preset.controllers;
     // copy known values back to entropy.def.controllers and UI
@@ -561,14 +579,65 @@ function applyPresetObject(preset) {
     }
   }
 
-  // Apply bundleDef and controllers by reconstructing entropy.
-  // Pass the full preset into _entropyBundleConfig so it receives the
-  // expected object shape (bundleDef, controllers, counters).
+  // Apply bundleDef and controllers by reconstructing entropy
   const cfg = _entropyBundleConfig(preset || null);
   const walker = _entropyConfig(preset.controllers || null);
+  
+  // Restore color settings if they were not in the preset
+  if (preset.controllers) {
+    // If color properties are missing from preset, restore saved values
+    if (!preset.controllers.hasOwnProperty('colorHue') && currentColorSettings.colorHue) {
+      cfg.controllers.colorHue = currentColorSettings.colorHue;
+    }
+    if (!preset.controllers.hasOwnProperty('colorSaturation') && currentColorSettings.colorSaturation) {
+      cfg.controllers.colorSaturation = currentColorSettings.colorSaturation;
+    }
+    if (!preset.controllers.hasOwnProperty('colorBrightness') && currentColorSettings.colorBrightness) {
+      cfg.controllers.colorBrightness = currentColorSettings.colorBrightness;
+    }
+    if (!preset.controllers.hasOwnProperty('useBrushColor')) {
+      cfg.controllers.useBrushColor = currentColorSettings.useBrushColor;
+    }
+    if (!preset.controllers.hasOwnProperty('brushColorHue')) {
+      cfg.controllers.brushColorHue = currentColorSettings.brushColorHue;
+    }
+    if (!preset.controllers.hasOwnProperty('brushColorSaturation')) {
+      cfg.controllers.brushColorSaturation = currentColorSettings.brushColorSaturation;
+    }
+    if (!preset.controllers.hasOwnProperty('brushColorBrightness')) {
+      cfg.controllers.brushColorBrightness = currentColorSettings.brushColorBrightness;
+    }
+    if (!preset.controllers.hasOwnProperty('sampleColor')) {
+      cfg.controllers.sampleColor = currentColorSettings.sampleColor;
+    }
+    if (!preset.controllers.hasOwnProperty('colorBlendMode')) {
+      cfg.controllers.colorBlendMode = currentColorSettings.colorBlendMode;
+    }
+    if (!preset.controllers.hasOwnProperty('opacity') && currentColorSettings.opacity) {
+      cfg.controllers.opacity = currentColorSettings.opacity;
+    }
+    if (!preset.controllers.hasOwnProperty('strokeWidth') && currentColorSettings.strokeWidth) {
+      cfg.controllers.strokeWidth = currentColorSettings.strokeWidth;
+    }
+  }
+  
+  // Restore background color if not in preset meta
+  if (!preset.meta || !preset.meta.bgColor) {
+    currentBgColor = currentBgColorValue;
+  }
+  
   entropy = new _entropyBundle(cfg, walker);
-  uiParamChanged();
-  buildTweakpaneUI(); // Rebuild Tweakpane UI with preset values
+  
+  // Sync old UI FROM entropy values (not the other way around)
+  // This updates the UI sliders to match the loaded preset without overwriting entropy
+  syncOldUIFromEntropy();
+  
+  // Rebuild the Tweakpane UI to show the loaded preset values
+  buildTweakpaneUI();
+  
+  // Also sync Tweakpane params to ensure everything is in sync
+  syncTweakpaneValues();
+  
   // clearCanvas(); // commented out to preserve previous canvas state
 }
 
