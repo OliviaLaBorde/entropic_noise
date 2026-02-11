@@ -85,34 +85,12 @@ class _entropyWalker {
       py = constrain(py, 0, sourceImageBuffer.height - 1);
 
       let rgb = sourceImageBuffer.get(px, py);
-      // Convert RGB to HSB manually to avoid colorMode switching
-      let r = red(rgb) / 255;
-      let g = green(rgb) / 255;
-      let b = blue(rgb) / 255;
       
-      let max = Math.max(r, g, b);
-      let min = Math.min(r, g, b);
-      let h, s, v = max;
-      let d = max - min;
-      s = max === 0 ? 0 : d / max;
-      
-      if (max === min) {
-        h = 0;
-      } else {
-        switch (max) {
-          case r: h = (g - b) / d + (g < b ? 6 : 0); break;
-          case g: h = (b - r) / d + 2; break;
-          case b: h = (r - g) / d + 4; break;
-        }
-        h /= 6;
-      }
-      
-      // Convert to HSB 0-100 scale
-      h = h * 100;
-      s = s * 100;
-      v = v * 100;
-      const a = map(this.def.controllers.opacity.val, 0, 255, 0, 100);
-      c = color(h, s, v, a);
+      // Create color in RGB mode with opacity
+      colorMode(RGB, 255);
+      c = color(red(rgb), green(rgb), blue(rgb), this.def.controllers.opacity.val);
+      // Switch back to HSB for other walkers
+      colorMode(HSB, 100);
 
     } else if (this.def.controllers.useBrushColor) {
       // Use fixed brush color - colorMode already set to HSB at bundle level
