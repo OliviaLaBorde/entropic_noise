@@ -331,20 +331,27 @@ function buildTweakpaneUI() {
     colorFolder.addInput(tweakpaneParams, 'colorBlendMode', {
       label: 'Blend Mode',
       options: {
-        'BLEND': 'BLEND',
-        'MULTIPLY': 'MULTIPLY',
-        'SCREEN': 'SCREEN',
-        'ADD': 'ADD',
-        'OVERLAY': 'OVERLAY',
-        'DARKEST': 'DARKEST',
-        'LIGHTEST': 'LIGHTEST',
-        'DIFFERENCE': 'DIFFERENCE',
-        'EXCLUSION': 'EXCLUSION',
-        'SOFT_LIGHT': 'SOFT_LIGHT',
-        'HARD_LIGHT': 'HARD_LIGHT'
+        'BLEND (Default)': 'BLEND',
+        'SCREEN (Fast)': 'SCREEN',
+        'ADD (Fast)': 'ADD',
+        '--- SLOW MODES ---': 'BLEND',
+        'MULTIPLY (⚠️ Slow)': 'MULTIPLY',
+        'OVERLAY (⚠️ Slow)': 'OVERLAY',
+        'DARKEST (⚠️ Slow)': 'DARKEST',
+        'LIGHTEST (⚠️ Slow)': 'LIGHTEST',
+        'DIFFERENCE (⚠️ Slow)': 'DIFFERENCE',
+        'EXCLUSION (⚠️ Slow)': 'EXCLUSION',
+        'SOFT_LIGHT (⚠️ Slow)': 'SOFT_LIGHT',
+        'HARD_LIGHT (⚠️ Slow)': 'HARD_LIGHT'
       }
     }).on('change', (ev) => {
       entropy.set_colorBlendMode(ev.value);
+      
+      // Show warning for slow blend modes
+      const slowModes = ['MULTIPLY', 'OVERLAY', 'DARKEST', 'LIGHTEST', 'DIFFERENCE', 'EXCLUSION', 'SOFT_LIGHT', 'HARD_LIGHT'];
+      if (slowModes.includes(ev.value)) {
+        showToast('⚠️ This blend mode uses CPU rendering and may be very slow', 3000);
+      }
     });
   }
 
@@ -1289,7 +1296,7 @@ function showHelpModal() {
         <li><strong>Brush Color</strong> - Pick your fixed brush color (when enabled).</li>
         <li><strong>Stroke Width</strong> - Line thickness. Very low values create delicate wispy lines.</li>
         <li><strong>Opacity</strong> - Line transparency. Lower = more transparent, creates layered effects.</li>
-        <li><strong>Color Blend Mode</strong> - How colors mix (Multiply, Screen, Add, etc.). Experiment!</li>
+        <li><strong>Color Blend Mode</strong> - How colors mix. <em>Note: BLEND, SCREEN, and ADD are fast (GPU-accelerated). Other modes use CPU rendering and may be very slow with high brush counts.</em></li>
         <li><strong>Sample Color from Image</strong> - When an image is loaded, sample colors from it as walkers move.</li>
         <li><strong>Background Color</strong> - Canvas background color.</li>
       </ul>

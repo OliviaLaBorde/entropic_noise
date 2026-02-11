@@ -72,7 +72,7 @@ class _entropyWalker {
   }
 
   render() {
-    blendMode(this.def.controllers.colorBlendMode);
+    // Performance: blend mode, colorMode, and strokeWeight are now set at bundle level
     let c;
     
     // Priority: 1. Sample from image, 2. Fixed brush color, 3. Color cycling
@@ -85,28 +85,45 @@ class _entropyWalker {
       py = constrain(py, 0, sourceImageBuffer.height - 1);
 
       let rgb = sourceImageBuffer.get(px, py);
-      colorMode(RGB, 255);
-      c = color(red(rgb), green(rgb), blue(rgb), this.def.controllers.opacity.val);
-      colorMode(HSB, 100);
+      // Convert RGB to HSB manually to avoid colorMode switching
+      let r = red(rgb) / 255;
+      let g = green(rgb) / 255;
+      let b = blue(rgb) / 255;
+      
+      let max = Math.max(r, g, b);
+      let min = Math.min(r, g, b);
+      let h, s, v = max;
+      let d = max - min;
+      s = max === 0 ? 0 : d / max;
+      
+      if (max === min) {
+        h = 0;
+      } else {
+        switch (max) {
+          case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+          case g: h = (b - r) / d + 2; break;
+          case b: h = (r - g) / d + 4; break;
+        }
+        h /= 6;
+      }
+      
+      // Convert to HSB 0-100 scale
+      h = h * 100;
+      s = s * 100;
+      v = v * 100;
+      const a = map(this.def.controllers.opacity.val, 0, 255, 0, 100);
+      c = color(h, s, v, a);
 
     } else if (this.def.controllers.useBrushColor) {
-      // Use fixed brush color - ensure we're in HSB mode
-      colorMode(HSB, 100);
+      // Use fixed brush color - colorMode already set to HSB at bundle level
       const h = this.def.controllers.brushColorHue || 0;
       const s = this.def.controllers.brushColorSaturation || 0;
       const b = this.def.controllers.brushColorBrightness || 100;
-      // Convert opacity from 0-255 range to 0-100 range for HSB mode
       const a = map(this.def.controllers.opacity.val, 0, 255, 0, 100);
       c = color(h, s, b, a);
       
-      // Debug: log once every 60 frames
-      if (frameCount % 60 === 0) {
-        console.log(`Rendering with brush color HSB(${h.toFixed(1)}, ${s.toFixed(1)}, ${b.toFixed(1)}, ${a.toFixed(1)})`);
-      }
     } else {
-      // Use color cycling (original behavior)
-      colorMode(HSB, 100);
-      // Convert opacity from 0-255 range to 0-100 range for HSB mode
+      // Use color cycling - colorMode already set to HSB at bundle level
       const a = map(this.def.controllers.opacity.val, 0, 255, 0, 100);
       c = color(
         this.def.controllers.colorHue.val,
@@ -117,8 +134,8 @@ class _entropyWalker {
     }
 
     stroke(c);
-
-    strokeWeight(this.def.controllers.strokeWidth.val);
+    
+    // strokeWeight is now set at bundle level for performance
     line(this.def.internals.prev_X, this.def.internals.prev_Y, this.def.internals.x, this.def.internals.y);
     let times = this.def.controllers.lineOffset_Times.val;
     let xOffset;
@@ -176,6 +193,11 @@ class _entropyBundle {
   }
 
   run(x, y) {
+    // Set blend mode and color mode ONCE at the bundle level (not per-walker for performance)
+    blendMode(this.def.controllers.colorBlendMode);
+    colorMode(HSB, 100); // Set once for all walkers
+    strokeWeight(this.def.controllers.strokeWidth.val); // Set once for all walkers
+    
     this.stepCounters();
     let c1val = this.def.counters.c1.val;
     let c2val = this.def.counters.c2.val;
