@@ -4,6 +4,8 @@ A noise-guided multi-walker generative drawing tool built with p5.js. It makes p
 
 *Minimalistic drawing fun - not trying to be anything other than what it is.*
 
+**[🎨 Try it live!](https://OliviaLaBorde.github.io/entropic_noise/)**
+
 Here's some stuff to look at:
 
 ![Photo Sampling](examples/photo_sampling.png)
