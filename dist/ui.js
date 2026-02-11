@@ -144,7 +144,7 @@ function buildTweakpaneUI() {
   if (entropy && entropy.def && entropy.def.controllers) {
     const controllersFolder = tweakpane.addFolder({
       title: 'Controllers',
-      expanded: true,
+      expanded: false,
     });
     
     // Build controls for non-color-related controllers
@@ -223,7 +223,7 @@ function buildTweakpaneUI() {
   // Color Controls folder
   const colorFolder = tweakpane.addFolder({
     title: 'Color Controls',
-    expanded: true,
+    expanded: false,
   });
 
   // Brush Color - Enable/Disable color cycling
@@ -484,13 +484,13 @@ function buildTweakpaneUI() {
     });
   }
 
-  // Cycle Speed Controls (Counter Steps)
+  // Cycle Speed Controls
   colorCyclingFolder.addSeparator();
 
   if (entropy.def.counters) {
     tweakpaneParams.hueSpeed = entropy.def.counters.c1.step;
     colorCyclingFolder.addInput(tweakpaneParams, 'hueSpeed', {
-      label: 'Hue Speed (c1)',
+      label: 'Hue Cycle Speed',
       min: 0,
       max: 0.5,
       step: 0.001
@@ -500,7 +500,7 @@ function buildTweakpaneUI() {
 
     tweakpaneParams.satSpeed = entropy.def.counters.c2.step;
     colorCyclingFolder.addInput(tweakpaneParams, 'satSpeed', {
-      label: 'Saturation Speed (c2)',
+      label: 'Saturation Cycle Speed',
       min: 0,
       max: 0.5,
       step: 0.001
@@ -510,13 +510,34 @@ function buildTweakpaneUI() {
 
     tweakpaneParams.brightSpeed = entropy.def.counters.c3.step;
     colorCyclingFolder.addInput(tweakpaneParams, 'brightSpeed', {
-      label: 'Brightness Speed (c3)',
+      label: 'Brightness Cycle Speed',
       min: 0,
       max: 0.5,
       step: 0.001
     }).on('change', (ev) => {
       entropy.def.counters.c3.step = ev.value;
     });
+    
+    // c4 and c5 are not currently used, commented out
+    // tweakpaneParams.c4Speed = entropy.def.counters.c4.step;
+    // colorCyclingFolder.addInput(tweakpaneParams, 'c4Speed', {
+    //   label: 'Counter 4 Speed',
+    //   min: 0,
+    //   max: 0.5,
+    //   step: 0.001
+    // }).on('change', (ev) => {
+    //   entropy.def.counters.c4.step = ev.value;
+    // });
+    
+    // tweakpaneParams.c5Speed = entropy.def.counters.c5.step;
+    // colorCyclingFolder.addInput(tweakpaneParams, 'c5Speed', {
+    //   label: 'Counter 5 Speed',
+    //   min: 0,
+    //   max: 0.5,
+    //   step: 0.001
+    // }).on('change', (ev) => {
+    //   entropy.def.counters.c5.step = ev.value;
+    // });
   }
 
   // Reset Color Cycling to defaults
@@ -660,41 +681,42 @@ function buildTweakpaneUI() {
     showToast('Color cycling reset to defaults', 2000);
   });
 
-  // Counters folder
-  if (entropy && entropy.def && entropy.def.counters) {
-    const countersFolder = tweakpane.addFolder({
-      title: 'Counters',
-      expanded: false,
-    });
-    
-    Object.keys(entropy.def.counters).forEach(key => {
-      const counter = entropy.def.counters[key];
-      
-      // Value
-      tweakpaneParams[`counter_${key}_val`] = counter.val;
-      countersFolder.addInput(tweakpaneParams, `counter_${key}_val`, {
-        label: `${key} (val)`,
-      }).on('change', (ev) => {
-        entropy.def.counters[key].val = ev.value;
-      });
-      
-      // Step
-      tweakpaneParams[`counter_${key}_step`] = counter.step;
-      countersFolder.addInput(tweakpaneParams, `counter_${key}_step`, {
-        label: `${key} (step)`,
-        min: 0,
-        max: 1,
-        step: 0.001
-      }).on('change', (ev) => {
-        entropy.def.counters[key].step = ev.value;
-      });
-    });
-  }
+  // Counters folder - COMMENTED OUT
+  // These are now in Color Cycling Settings as cycle speed controls
+  // if (entropy && entropy.def && entropy.def.counters) {
+  //   const countersFolder = tweakpane.addFolder({
+  //     title: 'Counters',
+  //     expanded: false,
+  //   });
+  //   
+  //   Object.keys(entropy.def.counters).forEach(key => {
+  //     const counter = entropy.def.counters[key];
+  //     
+  //     // Value - commented out, not user-facing
+  //     // tweakpaneParams[`counter_${key}_val`] = counter.val;
+  //     // countersFolder.addInput(tweakpaneParams, `counter_${key}_val`, {
+  //     //   label: `${key} (val)`,
+  //     // }).on('change', (ev) => {
+  //     //   entropy.def.counters[key].val = ev.value;
+  //     // });
+  //     
+  //     // Step - now in Color Cycling Settings folder
+  //     // tweakpaneParams[`counter_${key}_step`] = counter.step;
+  //     // countersFolder.addInput(tweakpaneParams, `counter_${key}_step`, {
+  //     //   label: `${key} (step)`,
+  //     //   min: 0,
+  //     //   max: 1,
+  //     //   step: 0.001
+  //     // }).on('change', (ev) => {
+  //     //   entropy.def.counters[key].step = ev.value;
+  //     // });
+  //   });
+  // }
 
   // Meta controls folder
   const metaFolder = tweakpane.addFolder({
     title: 'Meta Controls',
-    expanded: true,
+    expanded: false,
   });
 
   // Mic controls
@@ -758,7 +780,7 @@ function buildTweakpaneUI() {
   // Presets section
   const presetsFolder = tweakpane.addFolder({
     title: 'Presets',
-    expanded: false,
+    expanded: true,
   });
 
   // Build options object from presets store
