@@ -148,7 +148,7 @@ function buildTweakpaneUI() {
     });
     
     // Build controls for non-color-related controllers
-    const excludeKeys = ['strokeWidth', 'opacity', 'colorHue', 'colorSaturation', 'colorBrightness', 'colorBlendMode', 'sampleColor'];
+    const excludeKeys = ['strokeWidth', 'opacity', 'colorHue', 'colorSaturation', 'colorBrightness', 'colorBlendMode', 'sampleColor', 'useBrushColor', 'brushColorHue', 'brushColorSaturation', 'brushColorBrightness'];
     
     Object.keys(entropy.def.controllers).forEach(key => {
       if (excludeKeys.includes(key)) return; // Skip color-related controls
@@ -226,19 +226,53 @@ function buildTweakpaneUI() {
     expanded: false,
   });
 
-  // Brush Color - Enable/Disable color cycling
-  tweakpaneParams.enableBrushColor = false;
-  colorFolder.addInput(tweakpaneParams, 'enableBrushColor', {
-    label: 'Enable Brush Color'
+  // Color Mode Selector (replaces separate toggles)
+  tweakpaneParams.colorMode = 'cycling'; // Default to color cycling
+  
+  // Determine current color mode
+  if (entropy.def.controllers.useBrushColor) {
+    tweakpaneParams.colorMode = 'brush';
+  } else if (entropy.def.controllers.sampleColor) {
+    tweakpaneParams.colorMode = 'sample';
+  }
+  
+  colorFolder.addInput(tweakpaneParams, 'colorMode', {
+    label: 'Color Mode',
+    options: {
+      'Color Cycling (Auto)': 'cycling',
+      'Fixed Brush Color': 'brush',
+      'Sample from Image': 'sample'
+    }
   }).on('change', (ev) => {
-    // When disabled, use color cycling; when enabled, use fixed color
-    entropy.def.controllers.useBrushColor = ev.value;
+    // Reset all color modes first
+    entropy.def.controllers.useBrushColor = false;
+    entropy.def.controllers.sampleColor = false;
+    
+    // Enable the selected mode
+    if (ev.value === 'brush') {
+      entropy.def.controllers.useBrushColor = true;
+    } else if (ev.value === 'sample') {
+      entropy.def.controllers.sampleColor = true;
+    }
+    // 'cycling' leaves both false, which activates color cycling
+    
+    // Update all walkers
     entropy.c.forEach(item => {
-      item.def.controllers.useBrushColor = ev.value;
+      item.def.controllers.useBrushColor = entropy.def.controllers.useBrushColor;
+      item.def.controllers.sampleColor = entropy.def.controllers.sampleColor;
     });
+    
+    // Update old UI checkboxes if they exist
+    if (ui_checkbox_sampleColor) {
+      ui_checkbox_sampleColor.checked(entropy.def.controllers.sampleColor);
+    }
+    
+    showToast(`Color Mode: ${ev.value === 'cycling' ? 'Color Cycling' : ev.value === 'brush' ? 'Fixed Brush Color' : 'Sample from Image'}`, 2000);
   });
 
-  // Brush Color Picker
+  colorFolder.addSeparator();
+
+  // Brush Color Picker (only used when Color Mode = 'brush')
   tweakpaneParams.brushColor = '#ffffff';
   colorFolder.addInput(tweakpaneParams, 'brushColor', {
     label: 'Brush Color'
@@ -265,9 +299,13 @@ function buildTweakpaneUI() {
     let s = 0;
     const br = max;
     
-    if (delta !== 0) {
+    // Handle saturation - avoid divide by zero for black
+    if (max === 0) {
+      s = 0; // Black has no saturation
+    } else if (delta !== 0) {
       s = delta / max;
       
+      // Calculate hue
       if (max === rNorm) {
         h = ((gNorm - bNorm) / delta) % 6;
       } else if (max === gNorm) {
@@ -296,7 +334,11 @@ function buildTweakpaneUI() {
       item.def.controllers.brushColorBrightness = brightValue;
     });
     
-    console.log(`Brush Color: ${hexColor} (RGB ${r},${g},${b}) -> HSB(${hueValue.toFixed(1)}, ${satValue.toFixed(1)}, ${brightValue.toFixed(1)})`);
+    //console.log(`Brush Color Selected: ${hexColor}`);
+    //console.log(`  RGB: (${r}, ${g}, ${b})`);
+    //console.log(`  RGB Normalized: (${rNorm.toFixed(3)}, ${gNorm.toFixed(3)}, ${bNorm.toFixed(3)})`);
+    //console.log(`  max=${max.toFixed(3)}, min=${min.toFixed(3)}, delta=${delta.toFixed(3)}`);
+    //console.log(`  Final HSB: (${hueValue.toFixed(1)}, ${satValue.toFixed(1)}, ${brightValue.toFixed(1)})`);
   });
 
   // Stroke Width
@@ -355,16 +397,6 @@ function buildTweakpaneUI() {
     });
   }
 
-  // Sample Color from Image
-  if (entropy.def.controllers.sampleColor !== undefined) {
-    tweakpaneParams.sampleColor = entropy.def.controllers.sampleColor;
-    colorFolder.addInput(tweakpaneParams, 'sampleColor', {
-      label: 'Sample Color from Image'
-    }).on('change', (ev) => {
-      entropy.set_sampleColor(ev.value);
-    });
-  }
-
   // Background Color (moved from Meta Controls)
   tweakpaneParams.bgColor = '#000000';
   colorFolder.addInput(tweakpaneParams, 'bgColor', {
@@ -387,11 +419,10 @@ function buildTweakpaneUI() {
 
   // Add a button that explains when color cycling is active
   colorCyclingFolder.addButton({ 
-    title: 'ℹ️ Active when Brush Color OFF' 
+    title: 'ℹ️ Active in Cycling Mode' 
   }).on('click', () => {
     alert('Color Cycling is active when:\n\n' +
-          '✓ "Enable Brush Color" is OFF\n' +
-          '✓ "Sample Color from Image" is OFF\n\n' +
+          '✓ Color Mode is set to "Color Cycling (Auto)"\n\n' +
           'These controls set the range and speed of automatic color animation.');
   });
 
@@ -1314,22 +1345,27 @@ function showHelpModal() {
     <div class="help-section">
       <h3>🎨 Color Controls</h3>
       <ul>
-        <li><strong>Enable Brush Color</strong> - Use a fixed color instead of color cycling.</li>
-        <li><strong>Brush Color</strong> - Pick your fixed brush color (when enabled).</li>
+        <li><strong>Color Mode</strong> - Choose how colors are applied:
+          <ul>
+            <li><em>Color Cycling (Auto)</em> - Automatic animated color transitions (default)</li>
+            <li><em>Fixed Brush Color</em> - Use a single color you pick</li>
+            <li><em>Sample from Image</em> - Sample colors from a loaded image</li>
+          </ul>
+        </li>
+        <li><strong>Brush Color</strong> - Pick your fixed brush color (when Color Mode = Fixed).</li>
         <li><strong>Stroke Width</strong> - Line thickness. Very low values create delicate wispy lines.</li>
         <li><strong>Opacity</strong> - Line transparency. Lower = more transparent, creates layered effects.</li>
         <li><strong>Color Blend Mode</strong> - How colors mix. <em>Note: BLEND, SCREEN, and ADD are fast (GPU-accelerated). Other modes use CPU rendering and may be very slow with high brush counts.</em></li>
-        <li><strong>Sample Color from Image</strong> - When an image is loaded, sample colors from it as walkers move.</li>
         <li><strong>Background Color</strong> - Canvas background color.</li>
       </ul>
     </div>
 
     <div class="help-section">
       <h3>🌈 Color Cycling Settings</h3>
-      <p><em>Active when both "Enable Brush Color" and "Sample Color from Image" are OFF.</em></p>
+      <p><em>Active when Color Mode is set to "Color Cycling (Auto)".</em></p>
       <ul>
         <li><strong>Hue/Saturation/Brightness Min/Max</strong> - Define the range for automatic color animation.</li>
-        <li><strong>Hue/Saturation/Brightness Speed</strong> - How fast colors cycle through their ranges.</li>
+        <li><strong>Hue/Saturation/Brightness Cycle Speed</strong> - How fast colors cycle through their ranges.</li>
         <li><strong>Quick Presets</strong> - Instant color schemes (Rainbow, Cool Tones, Warm Tones, etc.).</li>
       </ul>
     </div>

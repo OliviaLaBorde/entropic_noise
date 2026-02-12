@@ -94,9 +94,9 @@ class _entropyWalker {
 
     } else if (this.def.controllers.useBrushColor) {
       // Use fixed brush color - colorMode already set to HSB at bundle level
-      const h = this.def.controllers.brushColorHue || 0;
-      const s = this.def.controllers.brushColorSaturation || 0;
-      const b = this.def.controllers.brushColorBrightness || 100;
+      const h = this.def.controllers.brushColorHue !== undefined ? this.def.controllers.brushColorHue : 0;
+      const s = this.def.controllers.brushColorSaturation !== undefined ? this.def.controllers.brushColorSaturation : 0;
+      const b = this.def.controllers.brushColorBrightness !== undefined ? this.def.controllers.brushColorBrightness : 100;
       const a = map(this.def.controllers.opacity.val, 0, 255, 0, 100);
       c = color(h, s, b, a);
       
