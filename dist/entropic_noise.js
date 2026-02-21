@@ -68,7 +68,14 @@ let sourceImage = null;
 let sourceImageX = 0;
 let sourceImageY = 0;
 let sourceImageScale = 1;
+let sourceImageOriginalBuffer = null;
 let sourceImageBuffer = null;
+let sourceImageCanvasBuffer = null;
+let showSourceImageOverlay = false;
+let sourceImageOverlayEl = null;
+let drawSourceImageOnCanvas = false;
+let sourceGlitchAmount = 0;
+let sourceGlitchChaos = 0.5;
 
 let debugDrawImageOnce = false;
 
@@ -196,6 +203,183 @@ function draw() {
   } */
 }
 
+function ensureSourceOverlayElement() {
+  if (sourceImageOverlayEl) return;
+  sourceImageOverlayEl = createImg('', 'Source Overlay');
+  sourceImageOverlayEl.style('position', 'fixed');
+  sourceImageOverlayEl.style('left', '0');
+  sourceImageOverlayEl.style('top', '0');
+  sourceImageOverlayEl.style('width', '100vw');
+  sourceImageOverlayEl.style('height', '100vh');
+  sourceImageOverlayEl.style('pointer-events', 'none');
+  sourceImageOverlayEl.style('object-fit', 'fill');
+  sourceImageOverlayEl.style('z-index', '5');
+  sourceImageOverlayEl.style('opacity', '0.8');
+  sourceImageOverlayEl.hide();
+}
+
+function setShowSourceImageOverlay(v) {
+  showSourceImageOverlay = !!v;
+  ensureSourceOverlayElement();
+
+  if (!sourceImageBuffer) {
+    sourceImageOverlayEl.hide();
+    return;
+  }
+
+  if (showSourceImageOverlay) {
+    sourceImageOverlayEl.show();
+  } else {
+    sourceImageOverlayEl.hide();
+  }
+}
+
+function setDrawSourceImageOnCanvas(v) {
+  drawSourceImageOnCanvas = !!v;
+  clearCanvas();
+}
+
+function _clampByte(v) {
+  return Math.max(0, Math.min(255, v));
+}
+
+function _clampInt(v, minV, maxV) {
+  return Math.max(minV, Math.min(maxV, Math.floor(v)));
+}
+
+function rebuildCanvasSourceBuffer() {
+  if (!sourceImageOriginalBuffer) {
+    sourceImageCanvasBuffer = null;
+    sourceImageBuffer = null;
+    return;
+  }
+
+  const g = createGraphics(width, height);
+  g.image(sourceImageOriginalBuffer, 0, 0);
+
+  const amt = Math.max(0, Math.min(1, sourceGlitchAmount));
+  const chaos = Math.max(0, Math.min(1, sourceGlitchChaos));
+  const intensity = Math.max(0, Math.min(1, amt * (0.4 + chaos * 0.9)));
+  if (amt > 0) {
+    const blocks = Math.floor(map(intensity, 0, 1, 0, 700));
+    const maxBlock = Math.floor(map(intensity, 0, 1, 6, 180));
+    const maxShift = Math.floor(map(intensity, 0, 1, 2, 180));
+
+    for (let i = 0; i < blocks; i++) {
+      const bw = Math.floor(random(4, maxBlock));
+      const bh = Math.floor(random(4, maxBlock));
+      const sx = Math.floor(random(0, Math.max(1, width - bw)));
+      const sy = Math.floor(random(0, Math.max(1, height - bh)));
+      const dx = Math.floor(constrain(sx + random(-maxShift, maxShift), 0, width - bw));
+      const dy = Math.floor(constrain(sy + random(-maxShift, maxShift), 0, height - bh));
+      g.copy(g, sx, sy, bw, bh, dx, dy, bw, bh);
+    }
+
+    // Horizontal tear lines
+    const tears = Math.floor(map(intensity, 0, 1, 0, 180));
+    for (let i = 0; i < tears; i++) {
+      const y = Math.floor(random(0, height));
+      const h = Math.floor(random(1, Math.max(2, map(chaos, 0, 1, 4, 20))));
+      const shift = Math.floor(random(-maxShift, maxShift));
+      const dy = _clampInt(y, 0, Math.max(0, height - h));
+      const dx = _clampInt(shift, -width, width);
+      g.copy(g, 0, dy, width, h, dx, dy, width, h);
+    }
+
+    g.loadPixels();
+    const totalPixels = g.pixels.length / 4;
+    const px = g.pixels.slice(); // snapshot for channel-shift sampling
+    const saltCount = Math.floor(totalPixels * map(intensity, 0, 1, 0, 0.08));
+    const jitter = map(intensity, 0, 1, 0, 140);
+    const shiftPx = Math.floor(map(intensity, 0, 1, 0, 12));
+
+    // RGB channel misalignment
+    if (shiftPx > 0) {
+      const rdx = _clampInt(random(-shiftPx, shiftPx), -shiftPx, shiftPx);
+      const gdy = _clampInt(random(-shiftPx, shiftPx), -shiftPx, shiftPx);
+      const bdx = _clampInt(random(-shiftPx, shiftPx), -shiftPx, shiftPx);
+
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const i = (y * width + x) * 4;
+          const rx = _clampInt(x + rdx, 0, width - 1);
+          const gy = _clampInt(y + gdy, 0, height - 1);
+          const bx = _clampInt(x + bdx, 0, width - 1);
+          const ri = (y * width + rx) * 4;
+          const gi = (gy * width + x) * 4;
+          const bi = (y * width + bx) * 4;
+          g.pixels[i] = px[ri];
+          g.pixels[i + 1] = px[gi + 1];
+          g.pixels[i + 2] = px[bi + 2];
+        }
+      }
+    }
+
+    // Posterize by reducing channel precision
+    const levels = _clampInt(map(intensity, 0, 1, 256, 10), 2, 256);
+    const qStep = 255 / (levels - 1);
+    for (let i = 0; i < g.pixels.length; i += 4) {
+      g.pixels[i] = Math.round(g.pixels[i] / qStep) * qStep;
+      g.pixels[i + 1] = Math.round(g.pixels[i + 1] / qStep) * qStep;
+      g.pixels[i + 2] = Math.round(g.pixels[i + 2] / qStep) * qStep;
+    }
+
+    for (let i = 0; i < saltCount; i++) {
+      const p = Math.floor(random(totalPixels));
+      const idx = p * 4;
+      g.pixels[idx] = _clampByte(g.pixels[idx] + random(-jitter, jitter));
+      g.pixels[idx + 1] = _clampByte(g.pixels[idx + 1] + random(-jitter, jitter));
+      g.pixels[idx + 2] = _clampByte(g.pixels[idx + 2] + random(-jitter, jitter));
+    }
+
+    // Invert random chunks for harsher corruption
+    const invertBlocks = Math.floor(map(intensity, 0, 1, 0, 65));
+    for (let b = 0; b < invertBlocks; b++) {
+      const bw = Math.floor(random(6, Math.max(8, maxBlock)));
+      const bh = Math.floor(random(6, Math.max(8, maxBlock)));
+      const sx = Math.floor(random(0, Math.max(1, width - bw)));
+      const sy = Math.floor(random(0, Math.max(1, height - bh)));
+      for (let yy = sy; yy < sy + bh; yy++) {
+        for (let xx = sx; xx < sx + bw; xx++) {
+          const idx = (yy * width + xx) * 4;
+          g.pixels[idx] = 255 - g.pixels[idx];
+          g.pixels[idx + 1] = 255 - g.pixels[idx + 1];
+          g.pixels[idx + 2] = 255 - g.pixels[idx + 2];
+        }
+      }
+    }
+
+    g.updatePixels();
+  }
+
+  sourceImageCanvasBuffer = g;
+  sourceImageBuffer = g; // Active source for both sampling and canvas drawing
+  updateSourceImageOverlayImage();
+}
+
+function setSourceGlitchAmount(v) {
+  sourceGlitchAmount = Math.max(0, Math.min(1, Number(v) || 0));
+  rebuildCanvasSourceBuffer();
+  if (drawSourceImageOnCanvas) {
+    clearCanvas();
+  }
+}
+
+function setSourceGlitchChaos(v) {
+  sourceGlitchChaos = Math.max(0, Math.min(1, Number(v) || 0.5));
+  rebuildCanvasSourceBuffer();
+  if (drawSourceImageOnCanvas) {
+    clearCanvas();
+  }
+}
+
+function updateSourceImageOverlayImage() {
+  if (!sourceImageBuffer) return;
+  ensureSourceOverlayElement();
+  sourceImageOverlayEl.attribute('src', sourceImageBuffer.canvas.toDataURL('image/png'));
+  if (showSourceImageOverlay) sourceImageOverlayEl.show();
+}
+
 function keyPressed() {
   if (keyCode === SHIFT) {
     if (ui_displayed) {
@@ -286,6 +470,10 @@ function getRand(min, max) {
 function clearCanvas() {
   clear();
   background(currentBgColor);
+  if (drawSourceImageOnCanvas && sourceImageBuffer) {
+    if (!sourceImageCanvasBuffer) rebuildCanvasSourceBuffer();
+    image(sourceImageCanvasBuffer || sourceImageBuffer, 0, 0);
+  }
   //uiHide();
 }
 
@@ -336,6 +524,29 @@ function resetEntropy() {
   currentDef.controllers.spreadOscillation = entropy.def.controllers.spreadOscillation;
   currentDef.controllers.spreadOscillationAmplitude = entropy.def.controllers.spreadOscillationAmplitude;
   currentDef.controllers.allowFunky = entropy.def.controllers.allowFunky;
+  currentDef.controllers.noiseModel = entropy.def.controllers.noiseModel;
+  currentDef.controllers.perlinOctaves.val = entropy.def.controllers.perlinOctaves.val;
+  currentDef.controllers.perlinFalloff.val = entropy.def.controllers.perlinFalloff.val;
+  currentDef.controllers.perlinScale.val = entropy.def.controllers.perlinScale.val;
+  currentDef.controllers.valueScale.val = entropy.def.controllers.valueScale.val;
+  currentDef.controllers.valueSmoothness.val = entropy.def.controllers.valueSmoothness.val;
+  currentDef.controllers.hashScale.val = entropy.def.controllers.hashScale.val;
+  currentDef.controllers.hashSteps.val = entropy.def.controllers.hashSteps.val;
+  currentDef.controllers.fbmBaseModel = entropy.def.controllers.fbmBaseModel;
+  currentDef.controllers.fbmOctaves.val = entropy.def.controllers.fbmOctaves.val;
+  currentDef.controllers.fbmLacunarity.val = entropy.def.controllers.fbmLacunarity.val;
+  currentDef.controllers.fbmGain.val = entropy.def.controllers.fbmGain.val;
+  currentDef.controllers.fbmScale.val = entropy.def.controllers.fbmScale.val;
+  currentDef.controllers.ridgedOctaves.val = entropy.def.controllers.ridgedOctaves.val;
+  currentDef.controllers.ridgedLacunarity.val = entropy.def.controllers.ridgedLacunarity.val;
+  currentDef.controllers.ridgedGain.val = entropy.def.controllers.ridgedGain.val;
+  currentDef.controllers.ridgedScale.val = entropy.def.controllers.ridgedScale.val;
+  currentDef.controllers.worleyScale.val = entropy.def.controllers.worleyScale.val;
+  currentDef.controllers.worleyJitter.val = entropy.def.controllers.worleyJitter.val;
+  currentDef.controllers.domainWarpScale.val = entropy.def.controllers.domainWarpScale.val;
+  currentDef.controllers.domainWarpStrength.val = entropy.def.controllers.domainWarpStrength.val;
+  currentDef.controllers.domainWarpFreq.val = entropy.def.controllers.domainWarpFreq.val;
+  currentDef.controllers.domainWarpOctaves.val = entropy.def.controllers.domainWarpOctaves.val;
   
   // Preserve counter step values
   currentDef.counters.c1.step = entropy.def.counters.c1.step;
@@ -381,7 +592,11 @@ function getPresetObject() {
     meta: {
       bgColor: (ui_colorPicker_bg && ui_colorPicker_bg.value) ? ui_colorPicker_bg.value() : null,
       useMic: useMic,
-      micGain: micGain
+      micGain: micGain,
+      showSourceImageOverlay: showSourceImageOverlay,
+      drawSourceImageOnCanvas: drawSourceImageOnCanvas,
+      sourceGlitchAmount: sourceGlitchAmount,
+      sourceGlitchChaos: sourceGlitchChaos
     }
   };
   return preset;
@@ -576,12 +791,46 @@ function applyPresetObject(preset) {
       if (preset.meta.bgColor) ui_colorPicker_bg.value(preset.meta.bgColor);
       if (preset.meta.useMic !== undefined) { useMic = preset.meta.useMic; ui_checkbox_useMic.checked(useMic); }
       if (preset.meta.micGain !== undefined) { micGain = preset.meta.micGain; ui_slider_micGain.value(micGain); ui_label_micGainValue.html(micGain.toFixed(1)); }
+      if (preset.meta.showSourceImageOverlay !== undefined) {
+        setShowSourceImageOverlay(preset.meta.showSourceImageOverlay);
+      }
+      if (preset.meta.drawSourceImageOnCanvas !== undefined) {
+        setDrawSourceImageOnCanvas(preset.meta.drawSourceImageOnCanvas);
+      }
+      if (preset.meta.sourceGlitchAmount !== undefined) {
+        setSourceGlitchAmount(preset.meta.sourceGlitchAmount);
+      }
+      if (preset.meta.sourceGlitchChaos !== undefined) {
+        setSourceGlitchChaos(preset.meta.sourceGlitchChaos);
+      }
     }
   }
 
   // Apply bundleDef and controllers by reconstructing entropy
   const cfg = _entropyBundleConfig(preset || null);
   const walker = _entropyConfig(preset.controllers || null);
+
+  // Backward compatibility for older presets: fill any missing keys from current defaults
+  const defaultCfg = _entropyBundleConfig();
+  if (!cfg.bundleDef) cfg.bundleDef = {};
+  if (!cfg.controllers) cfg.controllers = {};
+  if (!cfg.counters) cfg.counters = {};
+
+  Object.keys(defaultCfg.bundleDef).forEach(key => {
+    if (!cfg.bundleDef.hasOwnProperty(key)) {
+      cfg.bundleDef[key] = JSON.parse(JSON.stringify(defaultCfg.bundleDef[key]));
+    }
+  });
+  Object.keys(defaultCfg.controllers).forEach(key => {
+    if (!cfg.controllers.hasOwnProperty(key)) {
+      cfg.controllers[key] = JSON.parse(JSON.stringify(defaultCfg.controllers[key]));
+    }
+  });
+  Object.keys(defaultCfg.counters).forEach(key => {
+    if (!cfg.counters.hasOwnProperty(key)) {
+      cfg.counters[key] = JSON.parse(JSON.stringify(defaultCfg.counters[key]));
+    }
+  });
   
   // Restore color settings if they were not in the preset
   if (preset.controllers) {
@@ -714,10 +963,11 @@ function handleImage(file) {
       sourceImageX = Math.floor((width - scaledW) / 2);
       sourceImageY = Math.floor((height - scaledH) / 2);
 
-      sourceImageBuffer = createGraphics(width, height);
-      sourceImageBuffer.image(img, sourceImageX, sourceImageY, scaledW, scaledH); 
-      sourceImageBuffer.loadPixels();
-
+      sourceImageOriginalBuffer = createGraphics(width, height);
+      sourceImageOriginalBuffer.image(img, sourceImageX, sourceImageY, scaledW, scaledH);
+      sourceImageOriginalBuffer.loadPixels();
+      rebuildCanvasSourceBuffer();
+      setShowSourceImageOverlay(showSourceImageOverlay);
       clearCanvas();
     });
   }

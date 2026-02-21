@@ -148,7 +148,18 @@ function buildTweakpaneUI() {
     });
     
     // Build controls for non-color-related controllers
-    const excludeKeys = ['strokeWidth', 'opacity', 'colorHue', 'colorSaturation', 'colorBrightness', 'colorBlendMode', 'sampleColor', 'useBrushColor', 'brushColorHue', 'brushColorSaturation', 'brushColorBrightness'];
+    const excludeKeys = [
+      'strokeWidth', 'opacity', 'colorHue', 'colorSaturation', 'colorBrightness',
+      'colorBlendMode', 'sampleColor', 'useBrushColor', 'brushColorHue',
+      'brushColorSaturation', 'brushColorBrightness', 'noiseModel',
+      'perlinOctaves', 'perlinFalloff', 'perlinScale',
+      'valueScale', 'valueSmoothness',
+      'hashScale', 'hashSteps',
+      'fbmBaseModel', 'fbmOctaves', 'fbmLacunarity', 'fbmGain', 'fbmScale',
+      'ridgedOctaves', 'ridgedLacunarity', 'ridgedGain', 'ridgedScale',
+      'worleyScale', 'worleyJitter',
+      'domainWarpScale', 'domainWarpStrength', 'domainWarpFreq', 'domainWarpOctaves'
+    ];
     
     Object.keys(entropy.def.controllers).forEach(key => {
       if (excludeKeys.includes(key)) return; // Skip color-related controls
@@ -218,6 +229,115 @@ function buildTweakpaneUI() {
         });
       }
     });
+
+    // Explicit noise model selector (dropdown instead of free text)
+    if (entropy.def.controllers.noiseModel) {
+      tweakpaneParams.controller_noiseModel = entropy.def.controllers.noiseModel;
+      controllersFolder.addInput(tweakpaneParams, 'controller_noiseModel', {
+        label: 'noiseModel',
+        options: {
+          'Perlin (Default)': 'perlin',
+          'Value': 'value',
+          'Hash': 'hash',
+          'fBm': 'fbm',
+          'Ridged': 'ridged',
+          'Worley': 'worley',
+          'Domain Warp': 'domainWarp'
+        }
+      }).on('change', (ev) => {
+        entropy.set_noiseModel(ev.value);
+        buildTweakpaneUI(); // Rebuild so model-specific controls update
+      });
+    }
+
+    const noiseFolder = controllersFolder.addFolder({
+      title: 'Noise Parameters',
+      expanded: true,
+    });
+
+    function addNoiseParamControl(key, label) {
+      const param = entropy.def.controllers[key];
+      if (!param || typeof param !== 'object' || !param.hasOwnProperty('val')) return;
+
+      const paramKey = `controller_${key}`;
+      tweakpaneParams[paramKey] = param.val;
+
+      noiseFolder.addInput(tweakpaneParams, paramKey, {
+        label: label,
+        min: param.min,
+        max: param.max,
+        step: param.step
+      }).on('change', (ev) => {
+        if (entropy.def.controllers[key] && typeof entropy.def.controllers[key] === 'object') {
+          entropy.def.controllers[key].val = ev.value;
+          entropy.c.forEach(item => {
+            if (item.def.controllers[key] && typeof item.def.controllers[key] === 'object') {
+              item.def.controllers[key].val = ev.value;
+            }
+          });
+        }
+      });
+    }
+
+    function addNoiseChoiceControl(key, label, optionsMap) {
+      const current = entropy.def.controllers[key];
+      if (typeof current !== 'string') return;
+      const paramKey = `controller_${key}`;
+      tweakpaneParams[paramKey] = current;
+      noiseFolder.addInput(tweakpaneParams, paramKey, {
+        label: label,
+        options: optionsMap
+      }).on('change', (ev) => {
+        entropy.def.controllers[key] = ev.value;
+        entropy.c.forEach(item => {
+          item.def.controllers[key] = ev.value;
+        });
+      });
+    }
+
+    const activeNoiseModel = entropy.def.controllers.noiseModel || 'perlin';
+    if (activeNoiseModel === 'perlin') {
+      addNoiseParamControl('perlinOctaves', 'Octaves');
+      addNoiseParamControl('perlinFalloff', 'Falloff');
+      addNoiseParamControl('perlinScale', 'Scale');
+    } else if (activeNoiseModel === 'value') {
+      addNoiseParamControl('valueScale', 'Scale');
+      addNoiseParamControl('valueSmoothness', 'Smoothness');
+    } else if (activeNoiseModel === 'hash') {
+      addNoiseParamControl('hashScale', 'Scale');
+      addNoiseParamControl('hashSteps', 'Quantize Steps');
+    } else if (activeNoiseModel === 'fbm') {
+      addNoiseChoiceControl('fbmBaseModel', 'Base', {
+        'Perlin': 'perlin',
+        'Value': 'value',
+        'Hash': 'hash'
+      });
+      addNoiseParamControl('fbmOctaves', 'Octaves');
+      addNoiseParamControl('fbmLacunarity', 'Lacunarity');
+      addNoiseParamControl('fbmGain', 'Gain');
+      addNoiseParamControl('fbmScale', 'Scale');
+    } else if (activeNoiseModel === 'ridged') {
+      addNoiseParamControl('ridgedOctaves', 'Octaves');
+      addNoiseParamControl('ridgedLacunarity', 'Lacunarity');
+      addNoiseParamControl('ridgedGain', 'Gain');
+      addNoiseParamControl('ridgedScale', 'Scale');
+    } else if (activeNoiseModel === 'worley') {
+      addNoiseParamControl('worleyScale', 'Scale');
+      addNoiseParamControl('worleyJitter', 'Jitter');
+    } else if (activeNoiseModel === 'domainWarp') {
+      addNoiseChoiceControl('fbmBaseModel', 'Base', {
+        'Perlin': 'perlin',
+        'Value': 'value',
+        'Hash': 'hash'
+      });
+      addNoiseParamControl('domainWarpScale', 'Scale');
+      addNoiseParamControl('domainWarpStrength', 'Warp Strength');
+      addNoiseParamControl('domainWarpFreq', 'Warp Frequency');
+      addNoiseParamControl('domainWarpOctaves', 'Warp Octaves');
+      addNoiseParamControl('fbmOctaves', 'Detail Octaves');
+      addNoiseParamControl('fbmLacunarity', 'Detail Lacunarity');
+      addNoiseParamControl('fbmGain', 'Detail Gain');
+    }
   }
 
   // Color Controls folder
@@ -779,6 +899,43 @@ function buildTweakpaneUI() {
     autoDrawEnabled = ev.value;
   });
 
+  // Source image overlay (non-destructive reference layer)
+  tweakpaneParams.showSourceImageOverlay = showSourceImageOverlay;
+  metaFolder.addInput(tweakpaneParams, 'showSourceImageOverlay', {
+    label: 'Show Source Image'
+  }).on('change', (ev) => {
+    setShowSourceImageOverlay(ev.value);
+  });
+
+  // Draw source image onto the same canvas and paint over it
+  tweakpaneParams.drawSourceImageOnCanvas = drawSourceImageOnCanvas;
+  metaFolder.addInput(tweakpaneParams, 'drawSourceImageOnCanvas', {
+    label: 'Draw Source On Canvas'
+  }).on('change', (ev) => {
+    setDrawSourceImageOnCanvas(ev.value);
+  });
+
+  // Glitch amount for canvas source image only (overlay remains clean reference)
+  tweakpaneParams.sourceGlitchAmount = sourceGlitchAmount;
+  metaFolder.addInput(tweakpaneParams, 'sourceGlitchAmount', {
+    label: 'Glitch Amount',
+    min: 0,
+    max: 1,
+    step: 0.01
+  }).on('change', (ev) => {
+    setSourceGlitchAmount(ev.value);
+  });
+
+  tweakpaneParams.sourceGlitchChaos = sourceGlitchChaos;
+  metaFolder.addInput(tweakpaneParams, 'sourceGlitchChaos', {
+    label: 'Glitch Chaos',
+    min: 0,
+    max: 1,
+    step: 0.01
+  }).on('change', (ev) => {
+    setSourceGlitchChaos(ev.value);
+  });
+
   // Action buttons
   const actionsFolder = tweakpane.addFolder({
     title: 'Actions',
@@ -891,6 +1048,10 @@ function syncTweakpaneValues() {
   if (tweakpaneParams.useMic !== undefined) tweakpaneParams.useMic = useMic;
   if (tweakpaneParams.micGain !== undefined) tweakpaneParams.micGain = micGain;
   if (tweakpaneParams.autoDraw !== undefined) tweakpaneParams.autoDraw = autoDrawEnabled;
+  if (tweakpaneParams.showSourceImageOverlay !== undefined) tweakpaneParams.showSourceImageOverlay = showSourceImageOverlay;
+  if (tweakpaneParams.drawSourceImageOnCanvas !== undefined) tweakpaneParams.drawSourceImageOnCanvas = drawSourceImageOnCanvas;
+  if (tweakpaneParams.sourceGlitchAmount !== undefined) tweakpaneParams.sourceGlitchAmount = sourceGlitchAmount;
+  if (tweakpaneParams.sourceGlitchChaos !== undefined) tweakpaneParams.sourceGlitchChaos = sourceGlitchChaos;
   
   // Refresh the pane
   tweakpane.refresh();

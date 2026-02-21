@@ -4,8 +4,139 @@
  */
 
 // Helper function for noise
-function _noise(x) {
-  return noise(x);
+function _noiseHash(n) {
+  const s = Math.sin(n * 127.1) * 43758.5453123;
+  return s - Math.floor(s);
+}
+
+function _clamp01(v) {
+  return Math.max(0, Math.min(1, v));
+}
+
+function _noiseValue(x, smoothness) {
+  const i = Math.floor(x);
+  const f = x - i;
+  const t = _clamp01(smoothness);
+  const smoothF = f * f * (3 - 2 * f);
+  const u = f + (smoothF - f) * t;
+  const a = _noiseHash(i);
+  const b = _noiseHash(i + 1);
+  return a + u * (b - a);
+}
+
+function _getControllerVal(controllers, key, fallback) {
+  if (!controllers || !controllers.hasOwnProperty(key)) return fallback;
+  const v = controllers[key];
+  if (v && typeof v === 'object' && v.hasOwnProperty('val')) return v.val;
+  return v;
+}
+
+function _baseNoiseByModel(x, baseModel, controllers) {
+  const model = (typeof baseModel === 'string' && baseModel.length > 0) ? baseModel : 'perlin';
+  const perlinScale = Math.max(0.0001, Number(_getControllerVal(controllers, 'perlinScale', 1)) || 1);
+  const valueScale = Math.max(0.0001, Number(_getControllerVal(controllers, 'valueScale', 1)) || 1);
+  const hashScale = Math.max(0.0001, Number(_getControllerVal(controllers, 'hashScale', 1)) || 1);
+
+  if (model === 'value') {
+    return _noiseValue(x * valueScale, _clamp01(Number(_getControllerVal(controllers, 'valueSmoothness', 1)) || 1));
+  }
+  if (model === 'hash') {
+    const raw = _noiseHash(x * hashScale);
+    const steps = Math.max(0, Math.floor(Number(_getControllerVal(controllers, 'hashSteps', 0)) || 0));
+    if (steps <= 1) return raw;
+    return Math.floor(raw * steps) / steps;
+  }
+  const oct = Math.max(1, Math.floor(Number(_getControllerVal(controllers, 'perlinOctaves', 4)) || 4));
+  const falloff = _clamp01(Number(_getControllerVal(controllers, 'perlinFalloff', 0.5)) || 0.5);
+  noiseDetail(oct, falloff);
+  return noise(x * perlinScale);
+  //return noise(x);
+}
+
+function _noiseFbm(x, baseModel, octaves, lacunarity, gain, controllers) {
+  let sum = 0;
+  let amp = 1;
+  let freq = 1;
+  let norm = 0;
+  for (let i = 0; i < octaves; i++) {
+    sum += _baseNoiseByModel(x * freq, baseModel, controllers) * amp;
+    norm += amp;
+    amp *= gain;
+    freq *= lacunarity;
+  }
+  return norm > 0 ? _clamp01(sum / norm) : 0;
+}
+
+function _noiseRidged(x, octaves, lacunarity, gain, controllers) {
+  let sum = 0;
+  let amp = 1;
+  let freq = 1;
+  let norm = 0;
+  for (let i = 0; i < octaves; i++) {
+    const n = _baseNoiseByModel(x * freq, 'perlin', controllers);
+    const ridge = 1 - Math.abs(2 * n - 1);
+    sum += ridge * amp;
+    norm += amp;
+    amp *= gain;
+    freq *= lacunarity;
+  }
+  return norm > 0 ? _clamp01(sum / norm) : 0;
+}
+
+function _noiseWorley1D(x, jitter) {
+  const cell = Math.floor(x);
+  const fracX = x - cell;
+  let minDist = 999;
+  for (let i = -1; i <= 1; i++) {
+    const neighborCell = cell + i;
+    const feature = _noiseHash(neighborCell * 17.0);
+    const featurePos = i + feature * _clamp01(jitter);
+    const d = Math.abs(fracX - featurePos);
+    if (d < minDist) minDist = d;
+  }
+  return _clamp01(1 - minDist);
+}
+
+function _noise(x, model, controllers) {
+  const selected = (typeof model === 'string' && model.length > 0) ? model : 'perlin';
+  const baseModel = _getControllerVal(controllers, 'fbmBaseModel', 'perlin');
+
+  switch (selected) {
+    case 'perlin':
+    case 'value':
+    case 'hash':
+      return _baseNoiseByModel(x, selected, controllers);
+    case 'fbm': {
+      const oct = Math.max(1, Math.floor(Number(_getControllerVal(controllers, 'fbmOctaves', 5)) || 5));
+      const lac = Math.max(1.01, Number(_getControllerVal(controllers, 'fbmLacunarity', 2.0)) || 2.0);
+      const gain = _clamp01(Number(_getControllerVal(controllers, 'fbmGain', 0.5)) || 0.5);
+      const scale = Math.max(0.0001, Number(_getControllerVal(controllers, 'fbmScale', 1.0)) || 1.0);
+      return _noiseFbm(x * scale, baseModel, oct, lac, gain, controllers);
+    }
+    case 'ridged': {
+      const oct = Math.max(1, Math.floor(Number(_getControllerVal(controllers, 'ridgedOctaves', 5)) || 5));
+      const lac = Math.max(1.01, Number(_getControllerVal(controllers, 'ridgedLacunarity', 2.0)) || 2.0);
+      const gain = _clamp01(Number(_getControllerVal(controllers, 'ridgedGain', 0.5)) || 0.5);
+      const scale = Math.max(0.0001, Number(_getControllerVal(controllers, 'ridgedScale', 1.0)) || 1.0);
+      return _noiseRidged(x * scale, oct, lac, gain, controllers);
+    }
+    case 'worley': {
+      const scale = Math.max(0.0001, Number(_getControllerVal(controllers, 'worleyScale', 4.0)) || 4.0);
+      const jitter = _clamp01(Number(_getControllerVal(controllers, 'worleyJitter', 1.0)) || 1.0);
+      return _noiseWorley1D(x * scale, jitter);
+    }
+    case 'domainWarp': {
+      const scale = Math.max(0.0001, Number(_getControllerVal(controllers, 'domainWarpScale', 1.0)) || 1.0);
+      const warpStrength = Number(_getControllerVal(controllers, 'domainWarpStrength', 0.75)) || 0.75;
+      const warpFreq = Math.max(0.0001, Number(_getControllerVal(controllers, 'domainWarpFreq', 1.5)) || 1.5);
+      const warpOct = Math.max(1, Math.floor(Number(_getControllerVal(controllers, 'domainWarpOctaves', 3)) || 3));
+      const warp = _noiseFbm(x * warpFreq, 'perlin', warpOct, 2.0, 0.5, controllers);
+      const warpedX = x * scale + (warp - 0.5) * 2.0 * warpStrength;
+      return _noiseFbm(warpedX, baseModel, Math.max(1, Math.floor(Number(_getControllerVal(controllers, 'fbmOctaves', 5)) || 5)), Math.max(1.01, Number(_getControllerVal(controllers, 'fbmLacunarity', 2.0)) || 2.0), _clamp01(Number(_getControllerVal(controllers, 'fbmGain', 0.5)) || 0.5), controllers);
+    }
+    default:
+      return _baseNoiseByModel(x, 'perlin', controllers);
+  }
 }
 
 //_________________________________________________________________________________________________
@@ -55,8 +186,26 @@ class _entropyWalker {
     let spreadCalc = (this.def.internals.spread / 2);
     this.def.internals.prev_X = (this.def.internals.active === true) ? (this.def.internals.x) : x;
     this.def.internals.prev_Y = (this.def.internals.active === true) ? (this.def.internals.y) : y;
-    let mappedX = map(_noise(this.def.internals.noiseMap_X), 0, 1, (x + -spreadCalc), (x + spreadCalc));
-    let mappedY = map(_noise(this.def.internals.noiseMap_Y), 0, 1, (y + -spreadCalc), (y + spreadCalc));
+    const noiseModel = this.def.controllers.noiseModel || 'perlin';
+    const rawX = _noise(this.def.internals.noiseMap_X, noiseModel, this.def.controllers);
+    const rawY = _noise(this.def.internals.noiseMap_Y, noiseModel, this.def.controllers);
+    let mappedX;
+    let mappedY;
+
+    if (noiseModel === 'perlin') {
+      // Preserve legacy behavior for default Perlin model
+      mappedX = map(rawX, 0, 1, (x + -spreadCalc), (x + spreadCalc));
+      mappedY = map(rawY, 0, 1, (y + -spreadCalc), (y + spreadCalc));
+    } else {
+      // Keep non-Perlin models centered around cursor despite model-specific bias
+      const recenterRate = 0.02;
+      this.def.internals.noiseCenter_X = lerp(this.def.internals.noiseCenter_X, rawX, recenterRate);
+      this.def.internals.noiseCenter_Y = lerp(this.def.internals.noiseCenter_Y, rawY, recenterRate);
+      const centeredX = constrain(rawX - this.def.internals.noiseCenter_X + 0.5, 0, 1);
+      const centeredY = constrain(rawY - this.def.internals.noiseCenter_Y + 0.5, 0, 1);
+      mappedX = map(centeredX, 0, 1, (x + -spreadCalc), (x + spreadCalc));
+      mappedY = map(centeredY, 0, 1, (y + -spreadCalc), (y + spreadCalc));
+    }
     if (this.def.controllers.fixedAngle === true) {
       if (abs(mappedX - this.def.internals.prev_X) > abs(mappedY - this.def.internals.prev_Y)) { 
         this.def.internals.x = mappedX;
@@ -180,12 +329,13 @@ class _entropyBundle {
     let c1val = this.def.counters.c1.val;
     let c2val = this.def.counters.c2.val;
     let c3val = this.def.counters.c3.val;
+    const noiseModel = this.def.controllers.noiseModel || 'perlin';
     //let c4val = this.def.counters.c4.val;
     //let c5val = this.def.counters.c5.val;
     this.c.forEach( function(item, index) {
-      item.def.controllers.colorHue.val = map(_noise(c1val), 0, 1, item.def.controllers.colorHue.min, item.def.controllers.colorHue.max);
-      item.def.controllers.colorSaturation.val = map(_noise(c2val), 0, 1, item.def.controllers.colorSaturation.min, item.def.controllers.colorSaturation.max);
-      item.def.controllers.colorBrightness.val = map(_noise(c3val), 0, 1, item.def.controllers.colorBrightness.min, item.def.controllers.colorBrightness.max);
+      item.def.controllers.colorHue.val = map(_noise(c1val, noiseModel, item.def.controllers), 0, 1, item.def.controllers.colorHue.min, item.def.controllers.colorHue.max);
+      item.def.controllers.colorSaturation.val = map(_noise(c2val, noiseModel, item.def.controllers), 0, 1, item.def.controllers.colorSaturation.min, item.def.controllers.colorSaturation.max);
+      item.def.controllers.colorBrightness.val = map(_noise(c3val, noiseModel, item.def.controllers), 0, 1, item.def.controllers.colorBrightness.min, item.def.controllers.colorBrightness.max);
       item.run(x, y);
     });
   }
@@ -299,6 +449,13 @@ class _entropyBundle {
     this.c.forEach(item => item.def.controllers.spreadOscillationAmplitude = v);
   }
 
+  set_noiseModel(v) {
+    const valid = ['perlin', 'value', 'hash', 'fbm', 'ridged', 'worley', 'domainWarp'];
+    const model = valid.includes(v) ? v : 'perlin';
+    this.def.controllers.noiseModel = model;
+    this.c.forEach(item => item.def.controllers.noiseModel = model);
+  }
+
   _setConfig(_config) {
     if(_config === null) {
       return _entropyBundleConfig();
@@ -343,11 +500,36 @@ function _entropyConfig(_def_) {
       sampleColor: false,
       spreadOscillation: false,
       spreadOscillationAmplitude: 100,
-      allowFunky: false
+      allowFunky: false,
+      noiseModel: 'perlin',
+      perlinOctaves: { val: 4, min: 1, max: 8, step: 1 },
+      perlinFalloff: { val: 0.5, min: 0, max: 1, step: 0.01 },
+      perlinScale: { val: 1, min: 0.01, max: 20, step: 0.01 },
+      valueScale: { val: 1, min: 0.01, max: 20, step: 0.01 },
+      valueSmoothness: { val: 1, min: 0, max: 1, step: 0.01 },
+      hashScale: { val: 1, min: 0.01, max: 50, step: 0.01 },
+      hashSteps: { val: 0, min: 0, max: 64, step: 1 },
+      fbmBaseModel: 'perlin',
+      fbmOctaves: { val: 5, min: 1, max: 8, step: 1 },
+      fbmLacunarity: { val: 2, min: 1.01, max: 4, step: 0.01 },
+      fbmGain: { val: 0.5, min: 0.1, max: 1, step: 0.01 },
+      fbmScale: { val: 1, min: 0.01, max: 20, step: 0.01 },
+      ridgedOctaves: { val: 5, min: 1, max: 8, step: 1 },
+      ridgedLacunarity: { val: 2, min: 1.01, max: 4, step: 0.01 },
+      ridgedGain: { val: 0.5, min: 0.1, max: 1, step: 0.01 },
+      ridgedScale: { val: 1, min: 0.01, max: 20, step: 0.01 },
+      worleyScale: { val: 4, min: 0.1, max: 40, step: 0.1 },
+      worleyJitter: { val: 1, min: 0, max: 1, step: 0.01 },
+      domainWarpScale: { val: 1, min: 0.01, max: 20, step: 0.01 },
+      domainWarpStrength: { val: 0.75, min: 0, max: 4, step: 0.01 },
+      domainWarpFreq: { val: 1.5, min: 0.01, max: 10, step: 0.01 },
+      domainWarpOctaves: { val: 3, min: 1, max: 8, step: 1 }
     };
     obj.internals = {
       noiseMap_X: 0,
       noiseMap_Y: 1,
+      noiseCenter_X: 0.5,
+      noiseCenter_Y: 0.5,
       prev_X: 0,
       prev_Y: 0,
       x: 0,
@@ -402,7 +584,30 @@ function _entropyBundleConfig(_def_) {
       sampleColor: false,
       spreadOscillation: false,
       spreadOscillationAmplitude: 100,
-      allowFunky: false
+      allowFunky: false,
+      noiseModel: 'perlin',
+      perlinOctaves: { val: 4, min: 1, max: 8, step: 1 },
+      perlinFalloff: { val: 0.5, min: 0, max: 1, step: 0.01 },
+      perlinScale: { val: 1, min: 0.01, max: 20, step: 0.01 },
+      valueScale: { val: 1, min: 0.01, max: 20, step: 0.01 },
+      valueSmoothness: { val: 1, min: 0, max: 1, step: 0.01 },
+      hashScale: { val: 1, min: 0.01, max: 50, step: 0.01 },
+      hashSteps: { val: 0, min: 0, max: 64, step: 1 },
+      fbmBaseModel: 'perlin',
+      fbmOctaves: { val: 5, min: 1, max: 8, step: 1 },
+      fbmLacunarity: { val: 2, min: 1.01, max: 4, step: 0.01 },
+      fbmGain: { val: 0.5, min: 0.1, max: 1, step: 0.01 },
+      fbmScale: { val: 1, min: 0.01, max: 20, step: 0.01 },
+      ridgedOctaves: { val: 5, min: 1, max: 8, step: 1 },
+      ridgedLacunarity: { val: 2, min: 1.01, max: 4, step: 0.01 },
+      ridgedGain: { val: 0.5, min: 0.1, max: 1, step: 0.01 },
+      ridgedScale: { val: 1, min: 0.01, max: 20, step: 0.01 },
+      worleyScale: { val: 4, min: 0.1, max: 40, step: 0.1 },
+      worleyJitter: { val: 1, min: 0, max: 1, step: 0.01 },
+      domainWarpScale: { val: 1, min: 0.01, max: 20, step: 0.01 },
+      domainWarpStrength: { val: 0.75, min: 0, max: 4, step: 0.01 },
+      domainWarpFreq: { val: 1.5, min: 0.01, max: 10, step: 0.01 },
+      domainWarpOctaves: { val: 3, min: 1, max: 8, step: 1 }
     };
     obj.counters = {
       c1: { val: 0, step: 0.02 },
