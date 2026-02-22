@@ -907,6 +907,61 @@ function buildTweakpaneUI() {
     if (ui_label_micGainValue) ui_label_micGainValue.html(ev.value.toFixed(1));
   });
 
+  tweakpaneParams.micFormula = micFormula;
+  metaFolder.addInput(tweakpaneParams, 'micFormula', {
+    label: 'Mic Formula',
+    options: {
+      'Amplitude Curve': 'ampCurve',
+      'Amplitude Lift': 'ampLift',
+      'Envelope Delta': 'envDelta',
+      'Amplitude Jitter': 'ampJitter',
+      'FFT Flux': 'fftFlux'
+    }
+  }).on('change', (ev) => {
+    if (typeof setMicFormula === 'function') {
+      setMicFormula(ev.value);
+    } else {
+      micFormula = ev.value;
+    }
+  });
+
+  tweakpaneParams.micFftFluxGain = micFftFluxGain;
+  metaFolder.addInput(tweakpaneParams, 'micFftFluxGain', {
+    label: 'FFT Flux Gain',
+    min: 0,
+    max: 8,
+    step: 0.05
+  }).on('change', (ev) => {
+    micFftFluxGain = ev.value;
+  });
+
+  tweakpaneParams.micFftLowGate = micFftLowGate;
+  metaFolder.addInput(tweakpaneParams, 'micFftLowGate', {
+    label: 'FFT Low Gate',
+    min: 0,
+    max: 0.3,
+    step: 0.005
+  }).on('change', (ev) => {
+    micFftLowGate = ev.value;
+  });
+
+  tweakpaneParams.micFftExciteCurve = micFftExciteCurve;
+  metaFolder.addInput(tweakpaneParams, 'micFftExciteCurve', {
+    label: 'FFT Excite Curve',
+    min: 1,
+    max: 4,
+    step: 0.05
+  }).on('change', (ev) => {
+    micFftExciteCurve = ev.value;
+  });
+
+  tweakpaneParams.micAffectsStrokeWidth = micAffectsStrokeWidth;
+  metaFolder.addInput(tweakpaneParams, 'micAffectsStrokeWidth', {
+    label: 'Mic Affects Stroke'
+  }).on('change', (ev) => {
+    micAffectsStrokeWidth = ev.value;
+  });
+
   // Auto draw
   tweakpaneParams.autoDraw = autoDrawEnabled;
   metaFolder.addInput(tweakpaneParams, 'autoDraw', {
@@ -1063,6 +1118,11 @@ function syncTweakpaneValues() {
   // Sync meta values
   if (tweakpaneParams.useMic !== undefined) tweakpaneParams.useMic = useMic;
   if (tweakpaneParams.micGain !== undefined) tweakpaneParams.micGain = micGain;
+  if (tweakpaneParams.micFormula !== undefined) tweakpaneParams.micFormula = micFormula;
+  if (tweakpaneParams.micFftFluxGain !== undefined) tweakpaneParams.micFftFluxGain = micFftFluxGain;
+  if (tweakpaneParams.micFftLowGate !== undefined) tweakpaneParams.micFftLowGate = micFftLowGate;
+  if (tweakpaneParams.micFftExciteCurve !== undefined) tweakpaneParams.micFftExciteCurve = micFftExciteCurve;
+  if (tweakpaneParams.micAffectsStrokeWidth !== undefined) tweakpaneParams.micAffectsStrokeWidth = micAffectsStrokeWidth;
   if (tweakpaneParams.autoDraw !== undefined) tweakpaneParams.autoDraw = autoDrawEnabled;
   if (tweakpaneParams.showSourceImageOverlay !== undefined) tweakpaneParams.showSourceImageOverlay = showSourceImageOverlay;
   if (tweakpaneParams.drawSourceImageOnCanvas !== undefined) tweakpaneParams.drawSourceImageOnCanvas = drawSourceImageOnCanvas;

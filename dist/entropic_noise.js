@@ -81,11 +81,20 @@ let debugDrawImageOnce = false;
 
 // audio stuff
 let audioContext, analyser, micStream, audioData = new Uint8Array(256);
+let audioFreqData = new Uint8Array(256);
+let audioPrevFreqData = new Uint8Array(256);
 let audioVolume = 0;
 let micGain = 3.0;
 let useMic = false;
 let micInitInFlight = false;
 let micNextRetryAt = 0;
+let micFormula = 'ampCurve';
+let micEnvFast = 0;
+let micEnvSlow = 0;
+let micFftFluxGain = 3.0;
+let micFftLowGate = 0.06;
+let micFftExciteCurve = 2.2;
+let micAffectsStrokeWidth = false;
 
 let backgroundUpdate = false;
 let autoDrawEnabled = false;
@@ -171,11 +180,13 @@ function draw() {
     }
     audioVolume = Math.sqrt(sum / audioData.length);
 
-    // she got curves
-    let curved = pow(constrain(audioVolume * micGain, 0, 1), 1.5); // or try sqrt(audioVolume)
-      //let curved = sqrt(constrain(audioVolume * micGain, 0, 1));
-      //let curved = pow(constrain(audioVolume * 5.0, 0, 1), 2.0);
-    entropy.set_pushAmount(map(curved, 0, 0.2, 0.001, 0.08));
+    const micControl = computeMicControlValue();
+    entropy.set_pushAmount(map(micControl, 0, 1, 0.001, 0.1, true));
+    if (micAffectsStrokeWidth && entropy && entropy.def && entropy.def.controllers && entropy.def.controllers.strokeWidth) {
+      const sw = entropy.def.controllers.strokeWidth;
+      const strokeFromMic = map(micControl, 0, 1, sw.min, sw.max, true);
+      entropy.set_strokeWidth(strokeFromMic);
+    }
   }
 
   if (!ui_displayed) {
@@ -198,6 +209,67 @@ function draw() {
     const el = document.elementFromPoint(mouseX, mouseY);
     console.log("Mouse over:", el?.tagName, el?.className, el?.id);
   } */
+}
+
+function resetMicReactiveState() {
+  micEnvFast = 0;
+  micEnvSlow = 0;
+  audioPrevFreqData.fill(0);
+}
+
+function setMicFormula(v) {
+  const allowed = ['ampCurve', 'ampLift', 'envDelta', 'ampJitter', 'fftFlux'];
+  micFormula = allowed.includes(v) ? v : 'ampCurve';
+  resetMicReactiveState();
+}
+
+function computeMicControlValue() {
+  const x = constrain(audioVolume * micGain, 0, 1);
+
+  switch (micFormula) {
+    case 'ampLift': {
+      const curved = pow(x, 1.25);
+      const lifted = max(curved, x * 0.35);
+      return constrain(lifted, 0, 1);
+    }
+    case 'envDelta': {
+      micEnvFast = lerp(micEnvFast, x, 0.35);
+      micEnvSlow = lerp(micEnvSlow, x, 0.04);
+      const delta = max(0, micEnvFast - micEnvSlow);
+      const reactive = pow(micEnvSlow, 1.2) + (delta * 2.2);
+      return constrain(reactive, 0, 1);
+    }
+    case 'ampJitter': {
+      const base = pow(x, 1.2);
+      const jitterAmt = 0.01 + (0.04 * base);
+      const jitter = (Math.random() * 2 - 1) * jitterAmt;
+      return constrain(base + jitter, 0, 1);
+    }
+    case 'fftFlux': {
+      if (!analyser) return pow(x, 1.2);
+      analyser.getByteFrequencyData(audioFreqData);
+      let energy = 0;
+      let flux = 0;
+      for (let i = 0; i < audioFreqData.length; i++) {
+        const n = audioFreqData[i] / 255;
+        const p = audioPrevFreqData[i] / 255;
+        energy += n;
+        flux += max(0, n - p);
+        audioPrevFreqData[i] = audioFreqData[i];
+      }
+      energy /= audioFreqData.length;
+      flux /= audioFreqData.length;
+      const gateDenom = max(0.0001, 1 - micFftLowGate);
+      const gate = constrain((x - micFftLowGate) / gateDenom, 0, 1);
+      const ampGate = pow(gate, 1.2);
+      const ampExcite = pow(gate, micFftExciteCurve);
+      const base = pow(constrain(energy * micGain, 0, 1), 1.1) * (0.15 + 0.85 * ampGate);
+      return constrain(base + (flux * micFftFluxGain * ampExcite), 0, 1);
+    }
+    case 'ampCurve':
+    default:
+      return pow(x, 1.5);
+  }
 }
 
 async function ensureMicInput() {
@@ -624,6 +696,11 @@ function getPresetObject() {
       bgColor: (ui_colorPicker_bg && ui_colorPicker_bg.value) ? ui_colorPicker_bg.value() : null,
       useMic: useMic,
       micGain: micGain,
+      micFormula: micFormula,
+      micFftFluxGain: micFftFluxGain,
+      micFftLowGate: micFftLowGate,
+      micFftExciteCurve: micFftExciteCurve,
+      micAffectsStrokeWidth: micAffectsStrokeWidth,
       showSourceImageOverlay: showSourceImageOverlay,
       drawSourceImageOnCanvas: drawSourceImageOnCanvas,
       sourceGlitchAmount: sourceGlitchAmount,
@@ -804,7 +881,7 @@ function applyPresetObject(preset) {
   const currentBgColorValue = currentBgColor;
   
   // Apply controllers from preset
-  if (preset.controllers) {
+    if (preset.controllers) {
     const c = preset.controllers;
     // copy known values back to entropy.def.controllers and UI
     if (c.baseSpread && c.baseSpread.val !== undefined) ui_slide_baseSpread.value(c.baseSpread.val);
@@ -822,6 +899,11 @@ function applyPresetObject(preset) {
       if (preset.meta.bgColor) ui_colorPicker_bg.value(preset.meta.bgColor);
       if (preset.meta.useMic !== undefined) { useMic = preset.meta.useMic; ui_checkbox_useMic.checked(useMic); }
       if (preset.meta.micGain !== undefined) { micGain = preset.meta.micGain; ui_slider_micGain.value(micGain); ui_label_micGainValue.html(micGain.toFixed(1)); }
+      if (preset.meta.micFormula !== undefined) { setMicFormula(preset.meta.micFormula); }
+      if (preset.meta.micFftFluxGain !== undefined) { micFftFluxGain = preset.meta.micFftFluxGain; }
+      if (preset.meta.micFftLowGate !== undefined) { micFftLowGate = preset.meta.micFftLowGate; }
+      if (preset.meta.micFftExciteCurve !== undefined) { micFftExciteCurve = preset.meta.micFftExciteCurve; }
+      if (preset.meta.micAffectsStrokeWidth !== undefined) { micAffectsStrokeWidth = !!preset.meta.micAffectsStrokeWidth; }
       if (preset.meta.showSourceImageOverlay !== undefined) {
         setShowSourceImageOverlay(preset.meta.showSourceImageOverlay);
       }
