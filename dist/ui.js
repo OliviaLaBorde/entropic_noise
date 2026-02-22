@@ -31,7 +31,7 @@ function buildTweakpaneUI() {
   
   try {
     tweakpane = new Tweakpane.Pane({
-      title: 'Entropic Noise Controls',
+      title: 'Noise Controls',
       expanded: true,
       container: document.body,
     });
@@ -148,7 +148,18 @@ function buildTweakpaneUI() {
     });
     
     // Build controls for non-color-related controllers
-    const excludeKeys = ['strokeWidth', 'opacity', 'colorHue', 'colorSaturation', 'colorBrightness', 'colorBlendMode', 'sampleColor', 'useBrushColor', 'brushColorHue', 'brushColorSaturation', 'brushColorBrightness'];
+    const excludeKeys = [
+      'strokeWidth', 'opacity', 'colorHue', 'colorSaturation', 'colorBrightness',
+      'colorBlendMode', 'sampleColor', 'useBrushColor', 'brushColorHue',
+      'brushColorSaturation', 'brushColorBrightness', 'noiseModel', 'boundaryShape',
+      'perlinOctaves', 'perlinFalloff', 'perlinScale',
+      'valueScale', 'valueSmoothness',
+      'hashScale', 'hashSteps',
+      'fbmBaseModel', 'fbmOctaves', 'fbmLacunarity', 'fbmGain', 'fbmScale',
+      'ridgedOctaves', 'ridgedLacunarity', 'ridgedGain', 'ridgedScale',
+      'worleyScale', 'worleyJitter',
+      'domainWarpScale', 'domainWarpStrength', 'domainWarpFreq', 'domainWarpOctaves'
+    ];
     
     Object.keys(entropy.def.controllers).forEach(key => {
       if (excludeKeys.includes(key)) return; // Skip color-related controls
@@ -218,6 +229,128 @@ function buildTweakpaneUI() {
         });
       }
     });
+
+    // Explicit noise model selector (dropdown instead of free text)
+    if (entropy.def.controllers.noiseModel) {
+      tweakpaneParams.controller_noiseModel = entropy.def.controllers.noiseModel;
+      controllersFolder.addInput(tweakpaneParams, 'controller_noiseModel', {
+        label: 'noiseModel',
+        options: {
+          'Perlin (Default)': 'perlin',
+          'Value': 'value',
+          'Hash': 'hash',
+          'fBm': 'fbm',
+          'Ridged': 'ridged',
+          'Worley': 'worley',
+          'Domain Warp': 'domainWarp'
+        }
+      }).on('change', (ev) => {
+        entropy.set_noiseModel(ev.value);
+        buildTweakpaneUI(); // Rebuild so model-specific controls update
+      });
+    }
+
+    if (entropy.def.controllers.boundaryShape) {
+      tweakpaneParams.controller_boundaryShape = entropy.def.controllers.boundaryShape;
+      controllersFolder.addInput(tweakpaneParams, 'controller_boundaryShape', {
+        label: 'boundaryShape',
+        options: {
+          'Rectangle (Default)': 'rectangle',
+          'Circle': 'circle'
+        }
+      }).on('change', (ev) => {
+        entropy.set_boundaryShape(ev.value);
+      });
+    }
+
+    const noiseFolder = controllersFolder.addFolder({
+      title: 'Noise Parameters',
+      expanded: true,
+    });
+
+    function addNoiseParamControl(key, label) {
+      const param = entropy.def.controllers[key];
+      if (!param || typeof param !== 'object' || !param.hasOwnProperty('val')) return;
+
+      const paramKey = `controller_${key}`;
+      tweakpaneParams[paramKey] = param.val;
+
+      noiseFolder.addInput(tweakpaneParams, paramKey, {
+        label: label,
+        min: param.min,
+        max: param.max,
+        step: param.step
+      }).on('change', (ev) => {
+        if (entropy.def.controllers[key] && typeof entropy.def.controllers[key] === 'object') {
+          entropy.def.controllers[key].val = ev.value;
+          entropy.c.forEach(item => {
+            if (item.def.controllers[key] && typeof item.def.controllers[key] === 'object') {
+              item.def.controllers[key].val = ev.value;
+            }
+          });
+        }
+      });
+    }
+
+    function addNoiseChoiceControl(key, label, optionsMap) {
+      const current = entropy.def.controllers[key];
+      if (typeof current !== 'string') return;
+      const paramKey = `controller_${key}`;
+      tweakpaneParams[paramKey] = current;
+      noiseFolder.addInput(tweakpaneParams, paramKey, {
+        label: label,
+        options: optionsMap
+      }).on('change', (ev) => {
+        entropy.def.controllers[key] = ev.value;
+        entropy.c.forEach(item => {
+          item.def.controllers[key] = ev.value;
+        });
+      });
+    }
+
+    const activeNoiseModel = entropy.def.controllers.noiseModel || 'perlin';
+    if (activeNoiseModel === 'perlin') {
+      addNoiseParamControl('perlinOctaves', 'Octaves');
+      addNoiseParamControl('perlinFalloff', 'Falloff');
+      addNoiseParamControl('perlinScale', 'Scale');
+    } else if (activeNoiseModel === 'value') {
+      addNoiseParamControl('valueScale', 'Scale');
+      addNoiseParamControl('valueSmoothness', 'Smoothness');
+    } else if (activeNoiseModel === 'hash') {
+      addNoiseParamControl('hashScale', 'Scale');
+      addNoiseParamControl('hashSteps', 'Quantize Steps');
+    } else if (activeNoiseModel === 'fbm') {
+      addNoiseChoiceControl('fbmBaseModel', 'Base', {
+        'Perlin': 'perlin',
+        'Value': 'value',
+        'Hash': 'hash'
+      });
+      addNoiseParamControl('fbmOctaves', 'Octaves');
+      addNoiseParamControl('fbmLacunarity', 'Lacunarity');
+      addNoiseParamControl('fbmGain', 'Gain');
+      addNoiseParamControl('fbmScale', 'Scale');
+    } else if (activeNoiseModel === 'ridged') {
+      addNoiseParamControl('ridgedOctaves', 'Octaves');
+      addNoiseParamControl('ridgedLacunarity', 'Lacunarity');
+      addNoiseParamControl('ridgedGain', 'Gain');
+      addNoiseParamControl('ridgedScale', 'Scale');
+    } else if (activeNoiseModel === 'worley') {
+      addNoiseParamControl('worleyScale', 'Scale');
+      addNoiseParamControl('worleyJitter', 'Jitter');
+    } else if (activeNoiseModel === 'domainWarp') {
+      addNoiseChoiceControl('fbmBaseModel', 'Base', {
+        'Perlin': 'perlin',
+        'Value': 'value',
+        'Hash': 'hash'
+      });
+      addNoiseParamControl('domainWarpScale', 'Scale');
+      addNoiseParamControl('domainWarpStrength', 'Warp Strength');
+      addNoiseParamControl('domainWarpFreq', 'Warp Frequency');
+      addNoiseParamControl('domainWarpOctaves', 'Warp Octaves');
+      addNoiseParamControl('fbmOctaves', 'Detail Octaves');
+      addNoiseParamControl('fbmLacunarity', 'Detail Lacunarity');
+      addNoiseParamControl('fbmGain', 'Detail Gain');
+    }
   }
 
   // Color Controls folder
@@ -756,6 +889,9 @@ function buildTweakpaneUI() {
     label: 'Use Mic'
   }).on('change', (ev) => {
     useMic = ev.value;
+    if (useMic) {
+      ensureMicInput();
+    }
     if (ui_checkbox_useMic) ui_checkbox_useMic.checked(ev.value);
   });
 
@@ -771,12 +907,104 @@ function buildTweakpaneUI() {
     if (ui_label_micGainValue) ui_label_micGainValue.html(ev.value.toFixed(1));
   });
 
+  tweakpaneParams.micFormula = micFormula;
+  metaFolder.addInput(tweakpaneParams, 'micFormula', {
+    label: 'Mic Formula',
+    options: {
+      'Amplitude Curve': 'ampCurve',
+      'Amplitude Lift': 'ampLift',
+      'Envelope Delta': 'envDelta',
+      'Amplitude Jitter': 'ampJitter',
+      'FFT Flux': 'fftFlux'
+    }
+  }).on('change', (ev) => {
+    if (typeof setMicFormula === 'function') {
+      setMicFormula(ev.value);
+    } else {
+      micFormula = ev.value;
+    }
+  });
+
+  tweakpaneParams.micFftFluxGain = micFftFluxGain;
+  metaFolder.addInput(tweakpaneParams, 'micFftFluxGain', {
+    label: 'FFT Flux Gain',
+    min: 0,
+    max: 8,
+    step: 0.05
+  }).on('change', (ev) => {
+    micFftFluxGain = ev.value;
+  });
+
+  tweakpaneParams.micFftLowGate = micFftLowGate;
+  metaFolder.addInput(tweakpaneParams, 'micFftLowGate', {
+    label: 'FFT Low Gate',
+    min: 0,
+    max: 0.3,
+    step: 0.005
+  }).on('change', (ev) => {
+    micFftLowGate = ev.value;
+  });
+
+  tweakpaneParams.micFftExciteCurve = micFftExciteCurve;
+  metaFolder.addInput(tweakpaneParams, 'micFftExciteCurve', {
+    label: 'FFT Excite Curve',
+    min: 1,
+    max: 4,
+    step: 0.05
+  }).on('change', (ev) => {
+    micFftExciteCurve = ev.value;
+  });
+
+  tweakpaneParams.micAffectsStrokeWidth = micAffectsStrokeWidth;
+  metaFolder.addInput(tweakpaneParams, 'micAffectsStrokeWidth', {
+    label: 'Mic Affects Stroke'
+  }).on('change', (ev) => {
+    micAffectsStrokeWidth = ev.value;
+  });
+
   // Auto draw
   tweakpaneParams.autoDraw = autoDrawEnabled;
   metaFolder.addInput(tweakpaneParams, 'autoDraw', {
     label: 'Auto Draw (A key)'
   }).on('change', (ev) => {
     autoDrawEnabled = ev.value;
+  });
+
+  // Source image overlay (non-destructive reference layer)
+  tweakpaneParams.showSourceImageOverlay = showSourceImageOverlay;
+  metaFolder.addInput(tweakpaneParams, 'showSourceImageOverlay', {
+    label: 'Show Source Image'
+  }).on('change', (ev) => {
+    setShowSourceImageOverlay(ev.value);
+  });
+
+  // Draw source image onto the same canvas and paint over it
+  tweakpaneParams.drawSourceImageOnCanvas = drawSourceImageOnCanvas;
+  metaFolder.addInput(tweakpaneParams, 'drawSourceImageOnCanvas', {
+    label: 'Draw Source On Canvas'
+  }).on('change', (ev) => {
+    setDrawSourceImageOnCanvas(ev.value);
+  });
+
+  // Glitch amount for canvas source image only (overlay remains clean reference)
+  tweakpaneParams.sourceGlitchAmount = sourceGlitchAmount;
+  metaFolder.addInput(tweakpaneParams, 'sourceGlitchAmount', {
+    label: 'Glitch Amount',
+    min: 0,
+    max: 1,
+    step: 0.01
+  }).on('change', (ev) => {
+    setSourceGlitchAmount(ev.value);
+  });
+
+  tweakpaneParams.sourceGlitchChaos = sourceGlitchChaos;
+  metaFolder.addInput(tweakpaneParams, 'sourceGlitchChaos', {
+    label: 'Glitch Chaos',
+    min: 0,
+    max: 1,
+    step: 0.01
+  }).on('change', (ev) => {
+    setSourceGlitchChaos(ev.value);
   });
 
   // Action buttons
@@ -890,7 +1118,16 @@ function syncTweakpaneValues() {
   // Sync meta values
   if (tweakpaneParams.useMic !== undefined) tweakpaneParams.useMic = useMic;
   if (tweakpaneParams.micGain !== undefined) tweakpaneParams.micGain = micGain;
+  if (tweakpaneParams.micFormula !== undefined) tweakpaneParams.micFormula = micFormula;
+  if (tweakpaneParams.micFftFluxGain !== undefined) tweakpaneParams.micFftFluxGain = micFftFluxGain;
+  if (tweakpaneParams.micFftLowGate !== undefined) tweakpaneParams.micFftLowGate = micFftLowGate;
+  if (tweakpaneParams.micFftExciteCurve !== undefined) tweakpaneParams.micFftExciteCurve = micFftExciteCurve;
+  if (tweakpaneParams.micAffectsStrokeWidth !== undefined) tweakpaneParams.micAffectsStrokeWidth = micAffectsStrokeWidth;
   if (tweakpaneParams.autoDraw !== undefined) tweakpaneParams.autoDraw = autoDrawEnabled;
+  if (tweakpaneParams.showSourceImageOverlay !== undefined) tweakpaneParams.showSourceImageOverlay = showSourceImageOverlay;
+  if (tweakpaneParams.drawSourceImageOnCanvas !== undefined) tweakpaneParams.drawSourceImageOnCanvas = drawSourceImageOnCanvas;
+  if (tweakpaneParams.sourceGlitchAmount !== undefined) tweakpaneParams.sourceGlitchAmount = sourceGlitchAmount;
+  if (tweakpaneParams.sourceGlitchChaos !== undefined) tweakpaneParams.sourceGlitchChaos = sourceGlitchChaos;
   
   // Refresh the pane
   tweakpane.refresh();
@@ -1099,6 +1336,9 @@ function uiBuild() {
   ui_checkbox_useMic.style('color', '#ffffff');
   ui_checkbox_useMic.changed(() => {
     useMic = ui_checkbox_useMic.checked();
+    if (useMic) {
+      ensureMicInput();
+    }
   });
   y += 30;
 
@@ -1307,18 +1547,17 @@ function showHelpModal() {
   // Build the help content
   helpContent.innerHTML = `
     <div class="help-section">
-      <h3>🎮 Keyboard Shortcuts</h3>
+      <h3>Keyboard Shortcuts</h3>
       <ul>
         <li><code>H</code> - Hide/Show all UI panels (for full canvas drawing)</li>
         <li><code>C</code> - Clear canvas</li>
         <li><code>A</code> - Toggle Auto Draw mode</li>
-        <li><code>R</code> - Reset walkers (keeps all settings)</li>
-        <li><code>SHIFT</code> - Toggle old UI panel visibility</li>
+        <li><code>R</code> - Reset all walkers and noise run</li>
       </ul>
     </div>
 
     <div class="help-section">
-      <h3>📦 Bundle Definition</h3>
+      <h3>Bundle Definition</h3>
       <ul>
         <li><strong>Brush Count</strong> - Number of walkers drawing simultaneously. More = denser patterns but slower performance.</li>
         <li><strong>Push Offset</strong> - Varies the step speed between walkers (experimental).</li>
@@ -1327,7 +1566,7 @@ function showHelpModal() {
     </div>
 
     <div class="help-section">
-      <h3>🎛️ Controllers</h3>
+      <h3>Controllers</h3>
       <ul>
         <li><strong>Base Spread</strong> - How far walkers can wander from the mouse/center. Higher = wider spread.</li>
         <li><strong>Spread Amount</strong> - How much the spread increases over time (creates expanding patterns).</li>
@@ -1343,7 +1582,22 @@ function showHelpModal() {
     </div>
 
     <div class="help-section">
-      <h3>🎨 Color Controls</h3>
+      <h3>Noise Models</h3>
+      <p><em>Selects the movement and color-cycling noise source for walkers</em></p>
+      <ul>
+        <li><strong>Perlin</strong> - Smooth and goemetric at low push amounts - I think Ken would like it</li>
+        <li><strong>Value</strong> - Interpolated random values; similar to Perlin but with a different texture.</li>
+        <li><strong>Hash</strong> - Crisp pseudo-random chaotic jumps; use lower scale for less jitter.</li>
+        <li><strong>fBm</strong> - Layered octaves for richer detail. Tune with octaves/lacunarity/gain.</li>
+        <li><strong>Ridged</strong> - fBm-style model with sharper crest-like structure.</li>
+        <li><strong>Worley</strong> - Cellular/blocky pattern driven by nearest-feature distance.</li>
+        <li><strong>Domain Warp</strong> - Warps coordinates before sampling for more turbulent flow.</li>
+        <li><strong>Boundary Shape</strong> - Choose <em>Rectangle</em> or <em>Circle</em> spread bounds.</li>
+      </ul>
+    </div>
+
+    <div class="help-section">
+      <h3>Color Controls</h3>
       <ul>
         <li><strong>Color Mode</strong> - Choose how colors are applied:
           <ul>
@@ -1361,7 +1615,7 @@ function showHelpModal() {
     </div>
 
     <div class="help-section">
-      <h3>🌈 Color Cycling Settings</h3>
+      <h3>Color Cycling Settings</h3>
       <p><em>Active when Color Mode is set to "Color Cycling (Auto)".</em></p>
       <ul>
         <li><strong>Hue/Saturation/Brightness Min/Max</strong> - Define the range for automatic color animation.</li>
@@ -1371,16 +1625,16 @@ function showHelpModal() {
     </div>
 
     <div class="help-section">
-      <h3>⚙️ Meta Controls</h3>
+      <h3>Meta Controls</h3>
       <ul>
-        <li><strong>Auto Draw</strong> - Walkers draw continuously without mouse movement.</li>
-        <li><strong>Use Microphone</strong> - (Experimental) Control parameters with audio input.</li>
+        <li><strong>Auto Draw</strong> - Walkers draw continuously while following the mouse.</li>
+        <li><strong>Use Microphone</strong> - (Experimental) Control parameters with audio input. Currently uses input amplitude to adjust push amount which makes the walkers move faster and more chaotically.</li>
         <li><strong>Mic Gain</strong> - Sensitivity for microphone input.</li>
       </ul>
     </div>
 
     <div class="help-section">
-      <h3>🎬 Actions</h3>
+      <h3>Actions</h3>
       <ul>
         <li><strong>Clear Canvas</strong> - Erase everything and start fresh.</li>
         <li><strong>Reset Walkers</strong> - Reset walker positions and noise maps while keeping all your settings.</li>
@@ -1392,7 +1646,7 @@ function showHelpModal() {
     </div>
 
     <div class="help-section">
-      <h3>💡 Drawing Tips & Tricks</h3>
+      <h3>Drawing Tips & Tricks</h3>
       <ul>
         <li>Start with low opacity (10-50) and layer your strokes for rich, complex textures.</li>
         <li>Very low push amounts (0.001-0.01) create smooth, flowing lines.</li>
@@ -1406,7 +1660,7 @@ function showHelpModal() {
     </div>
 
     <div class="help-section">
-      <h3>🚀 Performance Tips</h3>
+      <h3>Performance Tips</h3>
       <ul>
         <li>Lower brush counts (20-100) run faster on older hardware.</li>
         <li>Higher brush counts (150-500+) create denser patterns but require more CPU.</li>
@@ -1415,7 +1669,7 @@ function showHelpModal() {
     </div>
 
     <p style="text-align: center; margin-top: 30px; color: #666;">
-      <em>More tips coming soon as we discover new techniques!</em>
+      <em>More tips coming soon as I find the energy - Just play with stuff</em>
     </p>
   `;
   

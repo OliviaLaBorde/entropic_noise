@@ -3,8 +3,10 @@
  * Contains the core entropy walker and bundle classes plus configuration functions
  */
 
-// Helper function for noise
-function _noise(x) {
+function _noise(x, model, controllers) {
+  if (window.EntropyNoiseModels && typeof window.EntropyNoiseModels.sample === 'function') {
+    return window.EntropyNoiseModels.sample(x, model, controllers);
+  }
   return noise(x);
 }
 
@@ -55,18 +57,53 @@ class _entropyWalker {
     let spreadCalc = (this.def.internals.spread / 2);
     this.def.internals.prev_X = (this.def.internals.active === true) ? (this.def.internals.x) : x;
     this.def.internals.prev_Y = (this.def.internals.active === true) ? (this.def.internals.y) : y;
-    let mappedX = map(_noise(this.def.internals.noiseMap_X), 0, 1, (x + -spreadCalc), (x + spreadCalc));
-    let mappedY = map(_noise(this.def.internals.noiseMap_Y), 0, 1, (y + -spreadCalc), (y + spreadCalc));
+    const noiseModel = this.def.controllers.noiseModel || 'perlin';
+    const rawX = _noise(this.def.internals.noiseMap_X, noiseModel, this.def.controllers);
+    const rawY = _noise(this.def.internals.noiseMap_Y, noiseModel, this.def.controllers);
+    let mappedX;
+    let mappedY;
+
+    if (noiseModel === 'perlin') {
+      // Preserve legacy behavior for default Perlin model
+      mappedX = map(rawX, 0, 1, (x + -spreadCalc), (x + spreadCalc));
+      mappedY = map(rawY, 0, 1, (y + -spreadCalc), (y + spreadCalc));
+    } else {
+      // Keep non-Perlin models centered around cursor despite model-specific bias
+      const recenterRate = 0.02;
+      this.def.internals.noiseCenter_X = lerp(this.def.internals.noiseCenter_X, rawX, recenterRate);
+      this.def.internals.noiseCenter_Y = lerp(this.def.internals.noiseCenter_Y, rawY, recenterRate);
+      const centeredX = constrain(rawX - this.def.internals.noiseCenter_X + 0.5, 0, 1);
+      const centeredY = constrain(rawY - this.def.internals.noiseCenter_Y + 0.5, 0, 1);
+      mappedX = map(centeredX, 0, 1, (x + -spreadCalc), (x + spreadCalc));
+      mappedY = map(centeredY, 0, 1, (y + -spreadCalc), (y + spreadCalc));
+    }
+    let nextX = mappedX;
+    let nextY = mappedY;
     if (this.def.controllers.fixedAngle === true) {
       if (abs(mappedX - this.def.internals.prev_X) > abs(mappedY - this.def.internals.prev_Y)) { 
-        this.def.internals.x = mappedX;
+        nextX = mappedX;
+        nextY = this.def.internals.y;
       } else { 
-        this.def.internals.y = mappedY;
+        nextX = this.def.internals.x;
+        nextY = mappedY;
       }
-    } else {
-      this.def.internals.x = mappedX;
-      this.def.internals.y = mappedY;
     }
+
+    // Optional circular boundary inscribed inside the rectangle spread area
+    const boundaryShape = this.def.controllers.boundaryShape || 'rectangle';
+    if (boundaryShape === 'circle') {
+      const dx = nextX - x;
+      const dy = nextY - y;
+      const d = Math.sqrt(dx * dx + dy * dy);
+      if (d > spreadCalc && d > 0) {
+        const k = spreadCalc / d;
+        nextX = x + dx * k;
+        nextY = y + dy * k;
+      }
+    }
+
+    this.def.internals.x = nextX;
+    this.def.internals.y = nextY;
     this.def.internals.noiseMap_X += random(0, this.def.controllers.pushAmount.val);
     this.def.internals.noiseMap_Y += random(0, this.def.controllers.pushAmount.val);
   }
@@ -180,12 +217,13 @@ class _entropyBundle {
     let c1val = this.def.counters.c1.val;
     let c2val = this.def.counters.c2.val;
     let c3val = this.def.counters.c3.val;
+    const noiseModel = this.def.controllers.noiseModel || 'perlin';
     //let c4val = this.def.counters.c4.val;
     //let c5val = this.def.counters.c5.val;
     this.c.forEach( function(item, index) {
-      item.def.controllers.colorHue.val = map(_noise(c1val), 0, 1, item.def.controllers.colorHue.min, item.def.controllers.colorHue.max);
-      item.def.controllers.colorSaturation.val = map(_noise(c2val), 0, 1, item.def.controllers.colorSaturation.min, item.def.controllers.colorSaturation.max);
-      item.def.controllers.colorBrightness.val = map(_noise(c3val), 0, 1, item.def.controllers.colorBrightness.min, item.def.controllers.colorBrightness.max);
+      item.def.controllers.colorHue.val = map(_noise(c1val, noiseModel, item.def.controllers), 0, 1, item.def.controllers.colorHue.min, item.def.controllers.colorHue.max);
+      item.def.controllers.colorSaturation.val = map(_noise(c2val, noiseModel, item.def.controllers), 0, 1, item.def.controllers.colorSaturation.min, item.def.controllers.colorSaturation.max);
+      item.def.controllers.colorBrightness.val = map(_noise(c3val, noiseModel, item.def.controllers), 0, 1, item.def.controllers.colorBrightness.min, item.def.controllers.colorBrightness.max);
       item.run(x, y);
     });
   }
@@ -299,6 +337,20 @@ class _entropyBundle {
     this.c.forEach(item => item.def.controllers.spreadOscillationAmplitude = v);
   }
 
+  set_noiseModel(v) {
+    const valid = ['perlin', 'value', 'hash', 'fbm', 'ridged', 'worley', 'domainWarp'];
+    const model = valid.includes(v) ? v : 'perlin';
+    this.def.controllers.noiseModel = model;
+    this.c.forEach(item => item.def.controllers.noiseModel = model);
+  }
+
+  set_boundaryShape(v) {
+    const valid = ['rectangle', 'circle'];
+    const shape = valid.includes(v) ? v : 'rectangle';
+    this.def.controllers.boundaryShape = shape;
+    this.c.forEach(item => item.def.controllers.boundaryShape = shape);
+  }
+
   _setConfig(_config) {
     if(_config === null) {
       return _entropyBundleConfig();
@@ -343,11 +395,37 @@ function _entropyConfig(_def_) {
       sampleColor: false,
       spreadOscillation: false,
       spreadOscillationAmplitude: 100,
-      allowFunky: false
+      allowFunky: false,
+      boundaryShape: 'rectangle',
+      noiseModel: 'perlin',
+      perlinOctaves: { val: 4, min: 1, max: 8, step: 1 },
+      perlinFalloff: { val: 0.5, min: 0, max: 1, step: 0.01 },
+      perlinScale: { val: 1, min: 0.01, max: 20, step: 0.01 },
+      valueScale: { val: 1, min: 0.01, max: 20, step: 0.01 },
+      valueSmoothness: { val: 1, min: 0, max: 1, step: 0.01 },
+      hashScale: { val: 1, min: 0.01, max: 50, step: 0.01 },
+      hashSteps: { val: 0, min: 0, max: 64, step: 1 },
+      fbmBaseModel: 'perlin',
+      fbmOctaves: { val: 5, min: 1, max: 8, step: 1 },
+      fbmLacunarity: { val: 2, min: 1.01, max: 4, step: 0.01 },
+      fbmGain: { val: 0.5, min: 0.1, max: 1, step: 0.01 },
+      fbmScale: { val: 1, min: 0.01, max: 20, step: 0.01 },
+      ridgedOctaves: { val: 5, min: 1, max: 8, step: 1 },
+      ridgedLacunarity: { val: 2, min: 1.01, max: 4, step: 0.01 },
+      ridgedGain: { val: 0.5, min: 0.1, max: 1, step: 0.01 },
+      ridgedScale: { val: 1, min: 0.01, max: 20, step: 0.01 },
+      worleyScale: { val: 4, min: 0.1, max: 40, step: 0.1 },
+      worleyJitter: { val: 1, min: 0, max: 1, step: 0.01 },
+      domainWarpScale: { val: 1, min: 0.01, max: 20, step: 0.01 },
+      domainWarpStrength: { val: 0.75, min: 0, max: 4, step: 0.01 },
+      domainWarpFreq: { val: 1.5, min: 0.01, max: 10, step: 0.01 },
+      domainWarpOctaves: { val: 3, min: 1, max: 8, step: 1 }
     };
     obj.internals = {
       noiseMap_X: 0,
       noiseMap_Y: 1,
+      noiseCenter_X: 0.5,
+      noiseCenter_Y: 0.5,
       prev_X: 0,
       prev_Y: 0,
       x: 0,
@@ -402,7 +480,31 @@ function _entropyBundleConfig(_def_) {
       sampleColor: false,
       spreadOscillation: false,
       spreadOscillationAmplitude: 100,
-      allowFunky: false
+      allowFunky: false,
+      boundaryShape: 'rectangle',
+      noiseModel: 'perlin',
+      perlinOctaves: { val: 4, min: 1, max: 8, step: 1 },
+      perlinFalloff: { val: 0.5, min: 0, max: 1, step: 0.01 },
+      perlinScale: { val: 1, min: 0.01, max: 20, step: 0.01 },
+      valueScale: { val: 1, min: 0.01, max: 20, step: 0.01 },
+      valueSmoothness: { val: 1, min: 0, max: 1, step: 0.01 },
+      hashScale: { val: 1, min: 0.01, max: 50, step: 0.01 },
+      hashSteps: { val: 0, min: 0, max: 64, step: 1 },
+      fbmBaseModel: 'perlin',
+      fbmOctaves: { val: 5, min: 1, max: 8, step: 1 },
+      fbmLacunarity: { val: 2, min: 1.01, max: 4, step: 0.01 },
+      fbmGain: { val: 0.5, min: 0.1, max: 1, step: 0.01 },
+      fbmScale: { val: 1, min: 0.01, max: 20, step: 0.01 },
+      ridgedOctaves: { val: 5, min: 1, max: 8, step: 1 },
+      ridgedLacunarity: { val: 2, min: 1.01, max: 4, step: 0.01 },
+      ridgedGain: { val: 0.5, min: 0.1, max: 1, step: 0.01 },
+      ridgedScale: { val: 1, min: 0.01, max: 20, step: 0.01 },
+      worleyScale: { val: 4, min: 0.1, max: 40, step: 0.1 },
+      worleyJitter: { val: 1, min: 0, max: 1, step: 0.01 },
+      domainWarpScale: { val: 1, min: 0.01, max: 20, step: 0.01 },
+      domainWarpStrength: { val: 0.75, min: 0, max: 4, step: 0.01 },
+      domainWarpFreq: { val: 1.5, min: 0.01, max: 10, step: 0.01 },
+      domainWarpOctaves: { val: 3, min: 1, max: 8, step: 1 }
     };
     obj.counters = {
       c1: { val: 0, step: 0.02 },
