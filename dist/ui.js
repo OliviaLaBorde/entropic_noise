@@ -31,7 +31,7 @@ function buildTweakpaneUI() {
   
   try {
     tweakpane = new Tweakpane.Pane({
-      title: 'Entropic Noise Controls',
+      title: 'Noise Controls',
       expanded: true,
       container: document.body,
     });
@@ -1487,18 +1487,17 @@ function showHelpModal() {
   // Build the help content
   helpContent.innerHTML = `
     <div class="help-section">
-      <h3>🎮 Keyboard Shortcuts</h3>
+      <h3>Keyboard Shortcuts</h3>
       <ul>
         <li><code>H</code> - Hide/Show all UI panels (for full canvas drawing)</li>
         <li><code>C</code> - Clear canvas</li>
         <li><code>A</code> - Toggle Auto Draw mode</li>
-        <li><code>R</code> - Reset walkers (keeps all settings)</li>
-        <li><code>SHIFT</code> - Toggle old UI panel visibility</li>
+        <li><code>R</code> - Reset all walkers and noise run</li>
       </ul>
     </div>
 
     <div class="help-section">
-      <h3>📦 Bundle Definition</h3>
+      <h3>Bundle Definition</h3>
       <ul>
         <li><strong>Brush Count</strong> - Number of walkers drawing simultaneously. More = denser patterns but slower performance.</li>
         <li><strong>Push Offset</strong> - Varies the step speed between walkers (experimental).</li>
@@ -1507,7 +1506,7 @@ function showHelpModal() {
     </div>
 
     <div class="help-section">
-      <h3>🎛️ Controllers</h3>
+      <h3>Controllers</h3>
       <ul>
         <li><strong>Base Spread</strong> - How far walkers can wander from the mouse/center. Higher = wider spread.</li>
         <li><strong>Spread Amount</strong> - How much the spread increases over time (creates expanding patterns).</li>
@@ -1523,7 +1522,22 @@ function showHelpModal() {
     </div>
 
     <div class="help-section">
-      <h3>🎨 Color Controls</h3>
+      <h3>Noise Models</h3>
+      <p><em>Selects the movement and color-cycling noise source for walkers</em></p>
+      <ul>
+        <li><strong>Perlin</strong> - Smooth and goemetric at low push amounts - I think Ken would like it</li>
+        <li><strong>Value</strong> - Interpolated random values; similar to Perlin but with a different texture.</li>
+        <li><strong>Hash</strong> - Crisp pseudo-random chaotic jumps; use lower scale for less jitter.</li>
+        <li><strong>fBm</strong> - Layered octaves for richer detail. Tune with octaves/lacunarity/gain.</li>
+        <li><strong>Ridged</strong> - fBm-style model with sharper crest-like structure.</li>
+        <li><strong>Worley</strong> - Cellular/blocky pattern driven by nearest-feature distance.</li>
+        <li><strong>Domain Warp</strong> - Warps coordinates before sampling for more turbulent flow.</li>
+        <li><strong>Boundary Shape</strong> - Choose <em>Rectangle</em> or <em>Circle</em> spread bounds.</li>
+      </ul>
+    </div>
+
+    <div class="help-section">
+      <h3>Color Controls</h3>
       <ul>
         <li><strong>Color Mode</strong> - Choose how colors are applied:
           <ul>
@@ -1541,7 +1555,7 @@ function showHelpModal() {
     </div>
 
     <div class="help-section">
-      <h3>🌈 Color Cycling Settings</h3>
+      <h3>Color Cycling Settings</h3>
       <p><em>Active when Color Mode is set to "Color Cycling (Auto)".</em></p>
       <ul>
         <li><strong>Hue/Saturation/Brightness Min/Max</strong> - Define the range for automatic color animation.</li>
@@ -1551,16 +1565,16 @@ function showHelpModal() {
     </div>
 
     <div class="help-section">
-      <h3>⚙️ Meta Controls</h3>
+      <h3>Meta Controls</h3>
       <ul>
-        <li><strong>Auto Draw</strong> - Walkers draw continuously without mouse movement.</li>
-        <li><strong>Use Microphone</strong> - (Experimental) Control parameters with audio input.</li>
+        <li><strong>Auto Draw</strong> - Walkers draw continuously while following the mouse.</li>
+        <li><strong>Use Microphone</strong> - (Experimental) Control parameters with audio input. Currently uses input amplitude to adjust push amount which makes the walkers move faster and more chaotically.</li>
         <li><strong>Mic Gain</strong> - Sensitivity for microphone input.</li>
       </ul>
     </div>
 
     <div class="help-section">
-      <h3>🎬 Actions</h3>
+      <h3>Actions</h3>
       <ul>
         <li><strong>Clear Canvas</strong> - Erase everything and start fresh.</li>
         <li><strong>Reset Walkers</strong> - Reset walker positions and noise maps while keeping all your settings.</li>
@@ -1572,7 +1586,7 @@ function showHelpModal() {
     </div>
 
     <div class="help-section">
-      <h3>💡 Drawing Tips & Tricks</h3>
+      <h3>Drawing Tips & Tricks</h3>
       <ul>
         <li>Start with low opacity (10-50) and layer your strokes for rich, complex textures.</li>
         <li>Very low push amounts (0.001-0.01) create smooth, flowing lines.</li>
@@ -1586,7 +1600,7 @@ function showHelpModal() {
     </div>
 
     <div class="help-section">
-      <h3>🚀 Performance Tips</h3>
+      <h3>Performance Tips</h3>
       <ul>
         <li>Lower brush counts (20-100) run faster on older hardware.</li>
         <li>Higher brush counts (150-500+) create denser patterns but require more CPU.</li>
@@ -1595,7 +1609,7 @@ function showHelpModal() {
     </div>
 
     <p style="text-align: center; margin-top: 30px; color: #666;">
-      <em>More tips coming soon as we discover new techniques!</em>
+      <em>More tips coming soon as I find the energy - Just play with stuff</em>
     </p>
   `;
   

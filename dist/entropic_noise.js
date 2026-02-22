@@ -172,7 +172,9 @@ function draw() {
     audioVolume = Math.sqrt(sum / audioData.length);
 
     // she got curves
-    let curved = pow(constrain(audioVolume * micGain, 0, 1), 1.5);
+    let curved = pow(constrain(audioVolume * micGain, 0, 1), 1.5); // or try sqrt(audioVolume)
+      //let curved = sqrt(constrain(audioVolume * micGain, 0, 1));
+      //let curved = pow(constrain(audioVolume * 5.0, 0, 1), 2.0);
     entropy.set_pushAmount(map(curved, 0, 0.2, 0.001, 0.08));
   }
 
