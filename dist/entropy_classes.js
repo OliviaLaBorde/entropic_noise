@@ -206,16 +206,33 @@ class _entropyWalker {
       mappedX = map(centeredX, 0, 1, (x + -spreadCalc), (x + spreadCalc));
       mappedY = map(centeredY, 0, 1, (y + -spreadCalc), (y + spreadCalc));
     }
+    let nextX = mappedX;
+    let nextY = mappedY;
     if (this.def.controllers.fixedAngle === true) {
       if (abs(mappedX - this.def.internals.prev_X) > abs(mappedY - this.def.internals.prev_Y)) { 
-        this.def.internals.x = mappedX;
+        nextX = mappedX;
+        nextY = this.def.internals.y;
       } else { 
-        this.def.internals.y = mappedY;
+        nextX = this.def.internals.x;
+        nextY = mappedY;
       }
-    } else {
-      this.def.internals.x = mappedX;
-      this.def.internals.y = mappedY;
     }
+
+    // Optional circular boundary inscribed inside the rectangle spread area
+    const boundaryShape = this.def.controllers.boundaryShape || 'rectangle';
+    if (boundaryShape === 'circle') {
+      const dx = nextX - x;
+      const dy = nextY - y;
+      const d = Math.sqrt(dx * dx + dy * dy);
+      if (d > spreadCalc && d > 0) {
+        const k = spreadCalc / d;
+        nextX = x + dx * k;
+        nextY = y + dy * k;
+      }
+    }
+
+    this.def.internals.x = nextX;
+    this.def.internals.y = nextY;
     this.def.internals.noiseMap_X += random(0, this.def.controllers.pushAmount.val);
     this.def.internals.noiseMap_Y += random(0, this.def.controllers.pushAmount.val);
   }
@@ -456,6 +473,13 @@ class _entropyBundle {
     this.c.forEach(item => item.def.controllers.noiseModel = model);
   }
 
+  set_boundaryShape(v) {
+    const valid = ['rectangle', 'circle'];
+    const shape = valid.includes(v) ? v : 'rectangle';
+    this.def.controllers.boundaryShape = shape;
+    this.c.forEach(item => item.def.controllers.boundaryShape = shape);
+  }
+
   _setConfig(_config) {
     if(_config === null) {
       return _entropyBundleConfig();
@@ -501,6 +525,7 @@ function _entropyConfig(_def_) {
       spreadOscillation: false,
       spreadOscillationAmplitude: 100,
       allowFunky: false,
+      boundaryShape: 'rectangle',
       noiseModel: 'perlin',
       perlinOctaves: { val: 4, min: 1, max: 8, step: 1 },
       perlinFalloff: { val: 0.5, min: 0, max: 1, step: 0.01 },
@@ -585,6 +610,7 @@ function _entropyBundleConfig(_def_) {
       spreadOscillation: false,
       spreadOscillationAmplitude: 100,
       allowFunky: false,
+      boundaryShape: 'rectangle',
       noiseModel: 'perlin',
       perlinOctaves: { val: 4, min: 1, max: 8, step: 1 },
       perlinFalloff: { val: 0.5, min: 0, max: 1, step: 0.01 },

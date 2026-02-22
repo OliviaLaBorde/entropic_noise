@@ -84,6 +84,8 @@ let audioContext, analyser, micStream, audioData = new Uint8Array(256);
 let audioVolume = 0;
 let micGain = 3.0;
 let useMic = false;
+let micInitInFlight = false;
+let micNextRetryAt = 0;
 
 let backgroundUpdate = false;
 let autoDrawEnabled = false;
@@ -114,18 +116,8 @@ function setup() {
     ui_displayed ? uiHide() : uiShow();
   });
 
-  // audio set up
-  navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
-    audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    micStream = audioContext.createMediaStreamSource(stream);
-    analyser = audioContext.createAnalyser();
-    analyser.fftSize = 512;
-    micStream.connect(analyser);
-  
-    console.log("🎤 Raw mic input initialized");
-  }).catch(err => {
-    console.error("🚫 Mic access denied:", err);
-  });
+  // Audio init (may need user gesture; retries handled by ensureMicInput)
+  ensureMicInput();
 
   uiBuild();
   uiHide(); // Hide the old UI immediately after building it
@@ -161,27 +153,30 @@ function draw() {
     debugDrawImageOnce = false;
   }
 
-  if (!ui_displayed) {
-
-    // Audio stuff
-    if (analyser && useMic) {
-      analyser.getByteTimeDomainData(audioData);
-      let sum = 0;
-      for (let i = 0; i < audioData.length; i++) {
-        let v = (audioData[i] - 128) / 128;
-        sum += v * v;
-      }
-      audioVolume = Math.sqrt(sum / audioData.length);
-
-      // drive walker behavior
-      //entropy.set_pushAmount(map(audioVolume, 0, 0.1, 0.001, 0.08));
-
-      // she got curves
-      let curved = pow(constrain(audioVolume * micGain, 0, 1), 1.5); // or try sqrt(audioVolume)
-      //let curved = sqrt(constrain(audioVolume * micGain, 0, 1));
-      //let curved = pow(constrain(audioVolume * 5.0, 0, 1), 2.0);
-      entropy.set_pushAmount(map(curved, 0, 0.2, 0.001, 0.08));
+  // Audio reactivity should run regardless of old UI visibility state.
+  // Also recover if the browser suspended the AudioContext.
+  if (useMic && (!analyser || !audioContext) && !micInitInFlight && Date.now() >= micNextRetryAt) {
+    ensureMicInput();
+  }
+  if (analyser && useMic) {
+    if (audioContext && audioContext.state === 'suspended') {
+      // Might still be blocked without user gesture; UI toggle handlers retry init.
+      audioContext.resume().catch(() => {});
     }
+    analyser.getByteTimeDomainData(audioData);
+    let sum = 0;
+    for (let i = 0; i < audioData.length; i++) {
+      let v = (audioData[i] - 128) / 128;
+      sum += v * v;
+    }
+    audioVolume = Math.sqrt(sum / audioData.length);
+
+    // she got curves
+    let curved = pow(constrain(audioVolume * micGain, 0, 1), 1.5);
+    entropy.set_pushAmount(map(curved, 0, 0.2, 0.001, 0.08));
+  }
+
+  if (!ui_displayed) {
 
     if (autoDrawEnabled) {
       //console.log("walkers:", entropy?.walkers?.length);
@@ -201,6 +196,39 @@ function draw() {
     const el = document.elementFromPoint(mouseX, mouseY);
     console.log("Mouse over:", el?.tagName, el?.className, el?.id);
   } */
+}
+
+async function ensureMicInput() {
+  if (micInitInFlight) return false;
+  micInitInFlight = true;
+  try {
+    if (audioContext && analyser) {
+      if (audioContext.state === 'suspended') {
+        await audioContext.resume();
+      }
+      return true;
+    }
+
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    micStream = audioContext.createMediaStreamSource(stream);
+    analyser = audioContext.createAnalyser();
+    analyser.fftSize = 512;
+    micStream.connect(analyser);
+
+    if (audioContext.state === 'suspended') {
+      await audioContext.resume();
+    }
+
+    console.log('Mic input initialized');
+    return true;
+  } catch (err) {
+    console.error('Mic init failed:', err);
+    micNextRetryAt = Date.now() + 2000;
+    return false;
+  } finally {
+    micInitInFlight = false;
+  }
 }
 
 function ensureSourceOverlayElement() {
@@ -524,6 +552,7 @@ function resetEntropy() {
   currentDef.controllers.spreadOscillation = entropy.def.controllers.spreadOscillation;
   currentDef.controllers.spreadOscillationAmplitude = entropy.def.controllers.spreadOscillationAmplitude;
   currentDef.controllers.allowFunky = entropy.def.controllers.allowFunky;
+  currentDef.controllers.boundaryShape = entropy.def.controllers.boundaryShape;
   currentDef.controllers.noiseModel = entropy.def.controllers.noiseModel;
   currentDef.controllers.perlinOctaves.val = entropy.def.controllers.perlinOctaves.val;
   currentDef.controllers.perlinFalloff.val = entropy.def.controllers.perlinFalloff.val;

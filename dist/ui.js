@@ -151,7 +151,7 @@ function buildTweakpaneUI() {
     const excludeKeys = [
       'strokeWidth', 'opacity', 'colorHue', 'colorSaturation', 'colorBrightness',
       'colorBlendMode', 'sampleColor', 'useBrushColor', 'brushColorHue',
-      'brushColorSaturation', 'brushColorBrightness', 'noiseModel',
+      'brushColorSaturation', 'brushColorBrightness', 'noiseModel', 'boundaryShape',
       'perlinOctaves', 'perlinFalloff', 'perlinScale',
       'valueScale', 'valueSmoothness',
       'hashScale', 'hashSteps',
@@ -247,6 +247,19 @@ function buildTweakpaneUI() {
       }).on('change', (ev) => {
         entropy.set_noiseModel(ev.value);
         buildTweakpaneUI(); // Rebuild so model-specific controls update
+      });
+    }
+
+    if (entropy.def.controllers.boundaryShape) {
+      tweakpaneParams.controller_boundaryShape = entropy.def.controllers.boundaryShape;
+      controllersFolder.addInput(tweakpaneParams, 'controller_boundaryShape', {
+        label: 'boundaryShape',
+        options: {
+          'Rectangle (Default)': 'rectangle',
+          'Circle': 'circle'
+        }
+      }).on('change', (ev) => {
+        entropy.set_boundaryShape(ev.value);
       });
     }
 
@@ -876,6 +889,9 @@ function buildTweakpaneUI() {
     label: 'Use Mic'
   }).on('change', (ev) => {
     useMic = ev.value;
+    if (useMic) {
+      ensureMicInput();
+    }
     if (ui_checkbox_useMic) ui_checkbox_useMic.checked(ev.value);
   });
 
@@ -1260,6 +1276,9 @@ function uiBuild() {
   ui_checkbox_useMic.style('color', '#ffffff');
   ui_checkbox_useMic.changed(() => {
     useMic = ui_checkbox_useMic.checked();
+    if (useMic) {
+      ensureMicInput();
+    }
   });
   y += 30;
 
