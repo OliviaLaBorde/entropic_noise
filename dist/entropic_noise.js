@@ -283,7 +283,13 @@ async function ensureMicInput() {
       return true;
     }
 
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        autoGainControl: false,
+        noiseSuppression: false,
+        echoCancellation: false
+      }
+    });
     audioContext = new (window.AudioContext || window.webkitAudioContext)();
     micStream = audioContext.createMediaStreamSource(stream);
     analyser = audioContext.createAnalyser();
