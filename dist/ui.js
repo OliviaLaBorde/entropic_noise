@@ -728,7 +728,7 @@ function buildTweakpaneUI() {
     showToast('Applied: Full Rainbow', 2000);
   });
 
-  const presetBtn2 = colorCyclingFolder.addButton({ title: '❄️ Cool Tones' });
+  const presetBtn2 = colorCyclingFolder.addButton({ title: 'Cool Tones' });
   presetBtn2.on('click', () => {
     entropy.def.controllers.colorHue.min = 40;
     entropy.def.controllers.colorHue.max = 70;
@@ -748,7 +748,7 @@ function buildTweakpaneUI() {
     showToast('Applied: Cool Tones', 2000);
   });
 
-  const presetBtn3 = colorCyclingFolder.addButton({ title: '🔥 Warm Tones' });
+  const presetBtn3 = colorCyclingFolder.addButton({ title: 'Warm Tones' });
   presetBtn3.on('click', () => {
     entropy.def.controllers.colorHue.min = 0;
     entropy.def.controllers.colorHue.max = 25;
@@ -768,7 +768,7 @@ function buildTweakpaneUI() {
     showToast('Applied: Warm Tones', 2000);
   });
 
-  const presetBtn4 = colorCyclingFolder.addButton({ title: '🌿 Earth Tones' });
+  const presetBtn4 = colorCyclingFolder.addButton({ title: 'Earth Tones' });
   presetBtn4.on('click', () => {
     entropy.def.controllers.colorHue.min = 10;
     entropy.def.controllers.colorHue.max = 40;
@@ -788,7 +788,7 @@ function buildTweakpaneUI() {
     showToast('Applied: Earth Tones', 2000);
   });
 
-  const presetBtn5 = colorCyclingFolder.addButton({ title: '🌑 Monochrome' });
+  const presetBtn5 = colorCyclingFolder.addButton({ title: 'Monochrome' });
   presetBtn5.on('click', () => {
     entropy.def.controllers.colorHue.min = 0;
     entropy.def.controllers.colorHue.max = 0;
@@ -1021,7 +1021,7 @@ function buildTweakpaneUI() {
     resetEntropy();
   });
 
-  actionsFolder.addButton({ title: '❓ Help & Tips' }).on('click', () => {
+  actionsFolder.addButton({ title: 'Help & Stuff' }).on('click', () => {
     showHelpModal();
   });
 
@@ -1090,7 +1090,7 @@ function buildTweakpaneUI() {
     openPresetModal();
   });
 
-  console.log('✨ Tweakpane UI built successfully');
+  console.log('Tweakpane UI built successfully');
   console.log('Tweakpane element:', tweakpane.element);
 }
 
@@ -1145,7 +1145,7 @@ function updateTweakpanePresetList() {
   // Use a small delay to batch multiple preset registrations
   clearTimeout(window.presetRebuildTimer);
   window.presetRebuildTimer = setTimeout(() => {
-    console.log(`🔄 Rebuilding Tweakpane UI with ${Object.keys(_presetsStore).length} presets...`);
+    console.log(`Rebuilding Tweakpane UI with ${Object.keys(_presetsStore).length} presets...`);
     buildTweakpaneUI();
   }, 500); // Wait 500ms after last preset registration
 }

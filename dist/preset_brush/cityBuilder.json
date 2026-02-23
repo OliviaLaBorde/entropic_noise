@@ -1,0 +1,274 @@
+{
+  "timestamp": 1771795963701,
+  "bundleDef": {
+    "brushCount": {
+      "val": 1,
+      "min": 1,
+      "max": 999,
+      "step": 1
+    },
+    "pushOffset": {
+      "val": 0,
+      "min": 0,
+      "max": 1,
+      "step": 0.01
+    },
+    "noiseMapOffset_X": {
+      "val": 0.01,
+      "min": 0.01,
+      "max": 100,
+      "step": 0.01
+    },
+    "noiseMapOffset_Y": {
+      "val": 0.01,
+      "min": 0.01,
+      "max": 100,
+      "step": 0.01
+    }
+  },
+  "controllers": {
+    "strokeWidth": {
+      "val": 0.02,
+      "min": 0.02,
+      "max": 5,
+      "step": 0.01
+    },
+    "opacity": {
+      "val": 255,
+      "min": 2,
+      "max": 255,
+      "step": 1
+    },
+    "baseSpread": {
+      "val": 50,
+      "min": 1,
+      "max": 1000,
+      "step": 1
+    },
+    "spreadAmount": {
+      "val": 0,
+      "min": 0,
+      "max": 10,
+      "step": 0.01
+    },
+    "pushAmount": {
+      "val": 0.0010000000000000018,
+      "min": 0.001,
+      "max": 1,
+      "step": 0.001
+    },
+    "lineOffset_X": {
+      "val": 0,
+      "min": 0,
+      "max": 900,
+      "step": 1
+    },
+    "lineOffset_Y": {
+      "val": 0,
+      "min": 0,
+      "max": 900,
+      "step": 1
+    },
+    "lineOffset_Times": {
+      "val": 3,
+      "min": 0,
+      "max": 30,
+      "step": 1
+    },
+    "colorBlendMode": "source-over",
+    "colorHue": {
+      "val": 0,
+      "min": 0,
+      "max": 0,
+      "step": 0.01
+    },
+    "colorSaturation": {
+      "val": 0,
+      "min": 0,
+      "max": 0,
+      "step": 0.01
+    },
+    "colorBrightness": {
+      "val": 0,
+      "min": 0,
+      "max": 100,
+      "step": 0.01
+    },
+    "useBrushColor": true,
+    "brushColorHue": 0,
+    "brushColorSaturation": 0,
+    "brushColorBrightness": 100,
+    "fixedAngle": true,
+    "updateXY": true,
+    "alwaysStep": true,
+    "sampleColor": false,
+    "spreadOscillation": false,
+    "spreadOscillationAmplitude": 100,
+    "allowFunky": false,
+    "boundaryShape": "rectangle",
+    "noiseModel": "hash",
+    "perlinOctaves": {
+      "val": 4,
+      "min": 1,
+      "max": 8,
+      "step": 1
+    },
+    "perlinFalloff": {
+      "val": 0.5,
+      "min": 0,
+      "max": 1,
+      "step": 0.01
+    },
+    "perlinScale": {
+      "val": 1,
+      "min": 0.01,
+      "max": 20,
+      "step": 0.01
+    },
+    "valueScale": {
+      "val": 1,
+      "min": 0.01,
+      "max": 20,
+      "step": 0.01
+    },
+    "valueSmoothness": {
+      "val": 1,
+      "min": 0,
+      "max": 1,
+      "step": 0.01
+    },
+    "hashScale": {
+      "val": 0.01,
+      "min": 0.01,
+      "max": 50,
+      "step": 0.01
+    },
+    "hashSteps": {
+      "val": 0,
+      "min": 0,
+      "max": 64,
+      "step": 1
+    },
+    "fbmBaseModel": "perlin",
+    "fbmOctaves": {
+      "val": 5,
+      "min": 1,
+      "max": 8,
+      "step": 1
+    },
+    "fbmLacunarity": {
+      "val": 2,
+      "min": 1.01,
+      "max": 4,
+      "step": 0.01
+    },
+    "fbmGain": {
+      "val": 0.5,
+      "min": 0.1,
+      "max": 1,
+      "step": 0.01
+    },
+    "fbmScale": {
+      "val": 1,
+      "min": 0.01,
+      "max": 20,
+      "step": 0.01
+    },
+    "ridgedOctaves": {
+      "val": 5,
+      "min": 1,
+      "max": 8,
+      "step": 1
+    },
+    "ridgedLacunarity": {
+      "val": 2,
+      "min": 1.01,
+      "max": 4,
+      "step": 0.01
+    },
+    "ridgedGain": {
+      "val": 0.5,
+      "min": 0.1,
+      "max": 1,
+      "step": 0.01
+    },
+    "ridgedScale": {
+      "val": 1,
+      "min": 0.01,
+      "max": 20,
+      "step": 0.01
+    },
+    "worleyScale": {
+      "val": 4,
+      "min": 0.1,
+      "max": 40,
+      "step": 0.1
+    },
+    "worleyJitter": {
+      "val": 1,
+      "min": 0,
+      "max": 1,
+      "step": 0.01
+    },
+    "domainWarpScale": {
+      "val": 1,
+      "min": 0.01,
+      "max": 20,
+      "step": 0.01
+    },
+    "domainWarpStrength": {
+      "val": 0.75,
+      "min": 0,
+      "max": 4,
+      "step": 0.01
+    },
+    "domainWarpFreq": {
+      "val": 1.5,
+      "min": 0.01,
+      "max": 10,
+      "step": 0.01
+    },
+    "domainWarpOctaves": {
+      "val": 3,
+      "min": 1,
+      "max": 8,
+      "step": 1
+    }
+  },
+  "counters": {
+    "c1": {
+      "val": 11.519999999999843,
+      "step": 0.02
+    },
+    "c2": {
+      "val": 28.800000000000274,
+      "step": 0.05
+    },
+    "c3": {
+      "val": 34.559999999999796,
+      "step": 0.06
+    },
+    "c4": {
+      "val": 5.759999999999922,
+      "step": 0.01
+    },
+    "c5": {
+      "val": 5.759999999999922,
+      "step": 0.01
+    }
+  },
+  "meta": {
+    "bgColor": "#000000",
+    "useMic": false,
+    "micGain": 3,
+    "micFormula": "ampCurve",
+    "micFftFluxGain": 3,
+    "micFftLowGate": 0.06,
+    "micFftExciteCurve": 2.2,
+    "micAffectsStrokeWidth": false,
+    "showSourceImageOverlay": false,
+    "drawSourceImageOnCanvas": false,
+    "sourceGlitchAmount": 0,
+    "sourceGlitchChaos": 0.5
+  }
+}
